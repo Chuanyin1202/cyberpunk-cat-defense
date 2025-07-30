@@ -38,6 +38,10 @@ class CyberpunkCatDefense {
         this.enemies = this.enemyManager.enemies;
         this.particles = this.particleManager.particles;
         
+        // 背景數據流粒子
+        this.backgroundParticles = [];
+        this.initBackgroundParticles();
+        
         // 控制
         this.lastFrameTime = 0;
         
@@ -134,6 +138,51 @@ class CyberpunkCatDefense {
                 this.resumeGame();
             }
         });
+    }
+    
+    // 初始化背景數據流粒子
+    initBackgroundParticles() {
+        const particleCount = 25;
+        for (let i = 0; i < particleCount; i++) {
+            this.backgroundParticles.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                speed: 20 + Math.random() * 30,  // 垂直速度
+                alpha: 0.1 + Math.random() * 0.2,  // 透明度
+                char: Math.random() > 0.5 ? '0' : '1',  // 二進制字符
+                size: 10 + Math.random() * 5,
+                color: '#00ff00'  // 矩陣綠
+            });
+        }
+    }
+    
+    // 更新背景粒子
+    updateBackgroundParticles(deltaTime) {
+        for (const particle of this.backgroundParticles) {
+            particle.y += particle.speed * deltaTime;
+            
+            // 重置到頂部
+            if (particle.y > this.canvas.height + 20) {
+                particle.y = -20;
+                particle.x = Math.random() * this.canvas.width;
+                particle.char = Math.random() > 0.5 ? '0' : '1';
+            }
+        }
+    }
+    
+    // 渲染背景粒子
+    renderBackgroundParticles(ctx) {
+        ctx.save();
+        ctx.font = 'monospace';
+        
+        for (const particle of this.backgroundParticles) {
+            ctx.globalAlpha = particle.alpha;
+            ctx.fillStyle = particle.color;
+            ctx.font = `${particle.size}px monospace`;
+            ctx.fillText(particle.char, particle.x, particle.y);
+        }
+        
+        ctx.restore();
     }
     
     // 初始化技能圖標
@@ -310,6 +359,33 @@ class CyberpunkCatDefense {
             window.objectPoolManager.update();
         }
         
+        // 更新背景粒子
+        this.updateBackgroundParticles(deltaTime);
+        
+        // 更新螢幕震動
+        if (this.screenShake && this.screenShake.duration > 0) {
+            this.screenShake.time += deltaTime;
+            if (this.screenShake.time < this.screenShake.duration) {
+                // 計算震動偏移
+                const progress = this.screenShake.time / this.screenShake.duration;
+                const intensity = this.screenShake.intensity * (1 - progress);
+                this.shakeOffsetX = (Math.random() - 0.5) * intensity;
+                this.shakeOffsetY = (Math.random() - 0.5) * intensity;
+            } else {
+                this.screenShake.duration = 0;
+                this.shakeOffsetX = 0;
+                this.shakeOffsetY = 0;
+            }
+        }
+        
+        // 更新警告閃爍
+        if (this.warningFlash && this.warningFlash.active) {
+            this.warningFlash.time += deltaTime;
+            if (this.warningFlash.time >= this.warningFlash.duration) {
+                this.warningFlash.active = false;
+            }
+        }
+        
         // 更新基地
         this.base.update(deltaTime);
         
@@ -344,9 +420,20 @@ class CyberpunkCatDefense {
     
     // 主渲染循環
     render() {
+        // 保存畫布狀態
+        this.ctx.save();
+        
+        // 應用螢幕震動
+        if (this.shakeOffsetX || this.shakeOffsetY) {
+            this.ctx.translate(this.shakeOffsetX || 0, this.shakeOffsetY || 0);
+        }
+        
         // 清空畫布
         this.ctx.fillStyle = '#000000';
-        this.ctx.fillRect(0, 0, GameConfig.CANVAS.WIDTH, GameConfig.CANVAS.HEIGHT);
+        this.ctx.fillRect(-50, -50, GameConfig.CANVAS.WIDTH + 100, GameConfig.CANVAS.HEIGHT + 100);
+        
+        // 渲染背景數據流（最底層）
+        this.renderBackgroundParticles(this.ctx);
         
         // 渲染基地（最重要的部分）
         this.base.render(this.ctx);
@@ -369,6 +456,14 @@ class CyberpunkCatDefense {
         
         // 渲染升級系統UI
         this.upgradeSystem.render(this.ctx);
+        
+        // 恢復畫布狀態（在所有渲染完成後）
+        this.ctx.restore();
+        
+        // 渲染警告閃爍效果（在恢復狀態後，不受震動影響）
+        if (this.warningFlash && this.warningFlash.active) {
+            this.renderWarningFlash(this.ctx);
+        }
     }
     
     // 創建投射物（基地攻擊用）
@@ -393,11 +488,15 @@ class CyberpunkCatDefense {
         };
         
         if (elements.lives) {
-            elements.lives.textContent = `${this.gameState.lives}/${GameConfig.GAME.INITIAL_LIVES}`;
-            // 根據血量設置顏色
-            if (this.gameState.lives <= 20) {
+            // 獲取升級後的最大血量
+            const maxHealth = this.upgradeSystem ? this.upgradeSystem.getMaxHealth() : GameConfig.GAME.INITIAL_LIVES;
+            elements.lives.textContent = `${this.gameState.lives}/${Math.floor(maxHealth)}`;
+            
+            // 根據血量百分比設置顏色
+            const healthPercent = this.gameState.lives / maxHealth;
+            if (healthPercent <= 0.2) {
                 elements.lives.style.color = '#ff0000';
-            } else if (this.gameState.lives <= 50) {
+            } else if (healthPercent <= 0.5) {
                 elements.lives.style.color = '#ffff00';
             } else {
                 elements.lives.style.color = '#00ff00';
@@ -556,6 +655,18 @@ class CyberpunkCatDefense {
             } else if (effect.lightningBolts !== undefined) {
                 // 渲染離子風暴
                 this.renderStormEffect(ctx, effect);
+            } else if (effect.type === 'energy_ring') {
+                // 渲染能量環
+                this.renderEnergyRing(ctx, effect);
+            } else if (effect.type === 'shockwave') {
+                // 渲染衝擊波
+                this.renderShockwave(ctx, effect);
+            } else if (effect.type === 'lightning') {
+                // 渲染閃電
+                this.renderLightning(ctx, effect);
+            } else if (effect.type === 'bullet_pulse') {
+                // 渲染子彈脈衝波紋
+                this.renderBulletPulse(ctx, effect);
             }
             
             ctx.restore();
@@ -735,6 +846,202 @@ class CyberpunkCatDefense {
             ctx.beginPath();
             ctx.arc(storm.x, storm.y, 8, 0, Math.PI * 2);
             ctx.fill();
+        }
+    }
+    
+    // 渲染能量環效果
+    renderEnergyRing(ctx, ring) {
+        const time = (Date.now() - ring.createdTime) / 1000;
+        const progress = time / ring.duration;
+        
+        // 計算當前半徑
+        ring.radius += ring.expandSpeed * (1/60);  // 假設60fps
+        
+        // 計算透明度（逐漸淡出）
+        const alpha = ring.alpha * (1 - progress);
+        
+        if (ring.radius < ring.maxRadius && alpha > 0) {
+            ctx.strokeStyle = ring.color;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = ring.color;
+            
+            // 繪製多層能量環
+            for (let i = 0; i < 3; i++) {
+                const layerAlpha = alpha * (1 - i * 0.3);
+                ctx.globalAlpha = layerAlpha;
+                ctx.lineWidth = 3 - i;
+                
+                ctx.beginPath();
+                ctx.arc(ring.x, ring.y, ring.radius - i * 5, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            // 添加能量粒子效果
+            if (Math.random() < 0.3) {
+                const angle = Math.random() * Math.PI * 2;
+                const particleX = ring.x + Math.cos(angle) * ring.radius;
+                const particleY = ring.y + Math.sin(angle) * ring.radius;
+                
+                this.particleManager.addParticle(particleX, particleY, {
+                    vx: Math.cos(angle) * 50,
+                    vy: Math.sin(angle) * 50,
+                    life: 0.3,
+                    color: ring.color,
+                    size: 2,
+                    type: 'spark',
+                    glow: true,
+                    fade: true
+                });
+            }
+        }
+    }
+    
+    // 渲染衝擊波效果
+    renderShockwave(ctx, shockwave) {
+        const time = (Date.now() - shockwave.createdTime) / 1000;
+        const progress = time / shockwave.duration;
+        
+        // 更新半徑
+        shockwave.radius += shockwave.expandSpeed * (1/60);
+        
+        if (shockwave.radius < shockwave.maxRadius && progress < 1) {
+            const alpha = shockwave.alpha * (1 - progress);
+            
+            ctx.strokeStyle = shockwave.color;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = shockwave.lineWidth;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = shockwave.color;
+            
+            // 繪製衝擊波圓環
+            ctx.beginPath();
+            ctx.arc(shockwave.x, shockwave.y, shockwave.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 內圈光暈
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.lineWidth = shockwave.lineWidth * 2;
+            ctx.beginPath();
+            ctx.arc(shockwave.x, shockwave.y, shockwave.radius * 0.9, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+    
+    // 渲染閃電效果
+    renderLightning(ctx, lightning) {
+        const time = (Date.now() - lightning.createdTime) / 1000;
+        const progress = time / lightning.duration;
+        
+        if (progress < 1) {
+            const alpha = lightning.alpha * (1 - progress);
+            
+            ctx.strokeStyle = lightning.color;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = lightning.lineWidth;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = lightning.color;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // 繪製主閃電
+            ctx.beginPath();
+            lightning.points.forEach((point, i) => {
+                if (i === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+            
+            // 繪製分支閃電
+            if (Math.random() < 0.5) {
+                const branchIndex = Math.floor(lightning.points.length / 2);
+                const branchPoint = lightning.points[branchIndex];
+                
+                ctx.globalAlpha = alpha * 0.5;
+                ctx.lineWidth = lightning.lineWidth * 0.5;
+                ctx.beginPath();
+                ctx.moveTo(branchPoint.x, branchPoint.y);
+                ctx.lineTo(
+                    branchPoint.x + (Math.random() - 0.5) * 50,
+                    branchPoint.y + (Math.random() - 0.5) * 50
+                );
+                ctx.stroke();
+            }
+        }
+    }
+    
+    // 渲染警告閃爍效果
+    renderWarningFlash(ctx) {
+        if (!this.warningFlash || !this.warningFlash.active) return;
+        
+        const progress = this.warningFlash.time / this.warningFlash.duration;
+        
+        // 脈衝閃爍效果
+        const pulseSpeed = 10;  // 每秒閃爍10次
+        const pulse = Math.sin(this.warningFlash.time * pulseSpeed * Math.PI) * 0.5 + 0.5;
+        const alpha = this.warningFlash.alpha * pulse * (1 - progress);
+        
+        // 全螢幕紅色閃爍
+        ctx.save();
+        ctx.fillStyle = this.warningFlash.color;
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(0, 0, GameConfig.CANVAS.WIDTH, GameConfig.CANVAS.HEIGHT);
+        
+        // 邊框強調效果
+        ctx.strokeStyle = this.warningFlash.color;
+        ctx.globalAlpha = alpha * 2;
+        ctx.lineWidth = 5;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = this.warningFlash.color;
+        ctx.strokeRect(5, 5, GameConfig.CANVAS.WIDTH - 10, GameConfig.CANVAS.HEIGHT - 10);
+        
+        // BOSS 警告文字
+        if (pulse > 0.5) {
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = alpha * 3;
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ff0066';
+            ctx.fillText('⚠ BOSS 來襲 ⚠', GameConfig.CANVAS.WIDTH / 2, GameConfig.CANVAS.HEIGHT / 2);
+        }
+        
+        ctx.restore();
+    }
+    
+    // 渲染子彈脈衝波紋效果
+    renderBulletPulse(ctx, pulse) {
+        const time = (Date.now() - pulse.createdTime) / 1000;
+        const progress = time / pulse.duration;
+        
+        if (progress >= 1) return;
+        
+        // 計算當前半徑
+        pulse.radius += pulse.expandSpeed * (1/60);  // 假設60fps
+        
+        // 計算透明度（逐漸淡出）
+        const alpha = pulse.alpha * (1 - progress);
+        
+        if (pulse.radius < pulse.maxRadius && alpha > 0) {
+            ctx.strokeStyle = pulse.color;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = pulse.color;
+            
+            // 繪製脈衝環
+            ctx.beginPath();
+            ctx.arc(pulse.x, pulse.y, pulse.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 內層稍小的環
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(pulse.x, pulse.y, pulse.radius * 0.8, 0, Math.PI * 2);
+            ctx.stroke();
         }
     }
     

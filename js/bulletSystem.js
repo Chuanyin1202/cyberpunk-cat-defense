@@ -12,7 +12,7 @@ class BulletSystem {
             basic: {
                 fireRate: 100,      // 發射間隔(ms)
                 speed: 500,         // 彈幕速度
-                damage: 10,         // 傷害
+                damage: 5,          // 傷害 (-50%)
                 size: 4,            // 彈幕大小 - 縮小
                 color: '#00ffff',   // 電子藍
                 glow: true          // 發光效果
@@ -20,7 +20,7 @@ class BulletSystem {
             spread: {
                 fireRate: 300,
                 speed: 400,
-                damage: 8,
+                damage: 4,          // 傷害 (-50%)
                 size: 3,            // 縮小
                 color: '#ff00ff',   // 霓虹粉
                 glow: true,
@@ -30,7 +30,7 @@ class BulletSystem {
             spiral: {
                 fireRate: 50,
                 speed: 350,
-                damage: 5,
+                damage: 2.5,        // 傷害 (-50%)
                 size: 2,            // 縮小
                 color: '#00ff88',   // 數位綠
                 glow: true,
@@ -39,7 +39,7 @@ class BulletSystem {
             ring: {
                 fireRate: 800,
                 speed: 300,
-                damage: 15,
+                damage: 7.5,        // 傷害 (-50%)
                 size: 5,            // 縮小
                 color: '#ff6600',   // 火焰橙
                 glow: true,
@@ -67,7 +67,8 @@ class BulletSystem {
         this.energyBar = {
             current: 0,
             max: 100,               // 能量條最大值（簡化為100）
-            damagePerPoint: 0.5,    // 每點傷害累積多少能量（降低50%）
+            baseDamagePerPoint: 0.3, // 基礎每點傷害累積能量（進一步降低）
+            maxDamagePerHit: 10,    // 單次命中最大能量累積
             autoTriggerThreshold: 100, // 自動觸發閾值
             decayRate: 0.5,         // 能量衰減速度 (每秒)
             lastDamageTime: 0       // 最後造成傷害的時間
@@ -330,8 +331,9 @@ class BulletSystem {
             color: config.color,
             glow: config.glow,
             active: true,
-            trail: [],
             lifetime: 0,
+            id: Math.random() * 1000, // 用於顏色變化
+            lastPulseTime: 0,  // 上次脈衝時間
             
             // 特殊屬性
             homing: config.homing || false,
@@ -339,6 +341,7 @@ class BulletSystem {
             piercing: config.piercing || false,
             spiral: config.spiral || false,
             wave: config.wave || false,
+            enhanced: config.enhanced || false,  // 標記是否為大招子彈
             hitEnemies: new Set()
         };
         
@@ -396,15 +399,8 @@ class BulletSystem {
             bullet.x += bullet.vx * deltaTime;
             bullet.y += bullet.vy * deltaTime;
             
-            // 恢復正常軌跡更新
-            bullet.trail.push({ x: bullet.x, y: bullet.y, life: 1.0 });
-            bullet.trail.forEach(point => {
-                point.life -= deltaTime * 4;
-            });
-            bullet.trail = bullet.trail.filter(point => point.life > 0);
-            if (bullet.trail.length > 8) { // 恢復軌跡長度
-                bullet.trail.shift();
-            }
+            // 生成脈衝波紋效果
+            this.updateBulletEffects(bullet, deltaTime);
             
             // 檢查邊界
             if (bullet.x < -50 || bullet.x > this.game.canvas.width + 50 ||
@@ -506,11 +502,25 @@ class BulletSystem {
         }
     }
     
-    // 累積傷害到能量條
+    // 累積傷害到能量條（平衡後期高傷害）
     addDamageToEnergy(damage) {
+        // 使用對數縮放來控制高傷害的能量累積
+        let energyGain = Math.min(
+            this.energyBar.maxDamagePerHit,
+            damage * this.energyBar.baseDamagePerPoint * (1 + Math.log10(Math.max(1, damage / 25)))
+        );
+        
+        // 進一步限制：高傷害時使用平方根縮放
+        if (damage > 50) {
+            energyGain = Math.min(
+                this.energyBar.maxDamagePerHit,
+                Math.sqrt(damage) * this.energyBar.baseDamagePerPoint * 2
+            );
+        }
+        
         this.energyBar.current = Math.min(
             this.energyBar.max, 
-            this.energyBar.current + damage * this.energyBar.damagePerPoint
+            this.energyBar.current + energyGain
         );
         this.energyBar.lastDamageTime = Date.now();
     }
@@ -521,7 +531,7 @@ class BulletSystem {
         
         // 重置能量條
         this.energyBar.current = 0;
-        this.specialAttackCooldown = 500; // 短冷卻，因為是自動觸發
+        this.specialAttackCooldown = 2000; // 增加冷卻時間到2秒
         
         // 自動在滑鼠位置或基地中心觸發華麗攻擊
         let targetX = this.base.x;
@@ -570,7 +580,8 @@ class BulletSystem {
                         color: pattern.color,
                         glow: true,
                         piercing: true,
-                        homing: patternIndex === 0 // 第一波有追蹤能力
+                        homing: patternIndex === 0, // 第一波有追蹤能力
+                        enhanced: true // 標記為大招子彈
                     });
                 }
             }, pattern.delay);
@@ -934,28 +945,14 @@ class BulletSystem {
                 
                 batchRenderer.finishBatch(ctx);
             } else {
-                // 高品質模式：先渲染軌跡，再渲染子彈
-                batchRenderer.startBatch('bullet_trails', (ctx) => {
-                    ctx.globalCompositeOperation = 'screen';
-                });
-                
-                for (const bullet of activeBullets) {
-                    if (bullet.trail.length > 1) {
-                        batchRenderer.addToBatch({
-                            render: (ctx) => this.renderCyberpunkTrail(ctx, bullet)
-                        });
-                    }
-                }
-                batchRenderer.finishBatch(ctx);
-                
-                // 渲染子彈主體
+                // 高品質模式：渲染子彈主體
                 batchRenderer.startBatch('bullet_bodies', (ctx) => {
                     ctx.globalCompositeOperation = 'screen';
                 });
                 
                 for (const bullet of activeBullets) {
                     batchRenderer.addToBatch({
-                        render: (ctx) => this.renderCyberpunkBullet(ctx, bullet)
+                        render: (ctx) => this.renderEnhancedBullet(ctx, bullet)
                     });
                 }
                 batchRenderer.finishBatch(ctx);
@@ -967,8 +964,7 @@ class BulletSystem {
                 if (shouldUseLOD) {
                     this.renderSimplifiedBullet(ctx, bullet);
                 } else {
-                    this.renderCyberpunkTrail(ctx, bullet);
-                    this.renderCyberpunkBullet(ctx, bullet);
+                    this.renderEnhancedBullet(ctx, bullet);
                 }
             }
         }
@@ -984,129 +980,277 @@ class BulletSystem {
         this.renderEnergyBar(ctx);
     }
     
-    // 恢復完整的軌跡渲染效果
-    renderCyberpunkTrail(ctx, bullet) {
-        if (bullet.trail.length < 2) return;
+    // 更新子彈特效系統
+    updateBulletEffects(bullet, deltaTime) {
+        const currentTime = Date.now();
+        const bulletCount = this.bullets.filter(b => b.active).length;
         
+        // LOD系統：子彈太多時減少特效
+        const shouldReduceEffects = bulletCount > 50;
+        const shouldDisableEffects = bulletCount > 100;
+        
+        if (shouldDisableEffects) return; // 極高負載時完全關閉特效
+        
+        // 脈衝波紋效果
+        const baseInterval = bullet.enhanced ? 100 : 200;
+        const pulseInterval = shouldReduceEffects ? baseInterval * 2 : baseInterval;
+        
+        if (currentTime - bullet.lastPulseTime > pulseInterval) {
+            this.createBulletPulse(bullet);
+            bullet.lastPulseTime = currentTime;
+        }
+        
+        // 粒子推進效果（減少頻率）
+        const particleChance = shouldReduceEffects ? 0.5 : 1.0;
+        if (Math.random() < particleChance) {
+            this.createBulletParticles(bullet, deltaTime);
+        }
+    }
+    
+    // 創建子彈脈衝波紋
+    createBulletPulse(bullet) {
+        if (!this.game.specialEffects) {
+            this.game.specialEffects = [];
+        }
+        
+        const maxRadius = bullet.enhanced ? 50 : 30;
+        const color = bullet.enhanced ? this.getDynamicColor(bullet) : bullet.color;
+        
+        this.game.specialEffects.push({
+            type: 'bullet_pulse',
+            x: bullet.x,
+            y: bullet.y,
+            radius: bullet.size,
+            maxRadius: maxRadius,
+            expandSpeed: bullet.enhanced ? 400 : 200,
+            alpha: bullet.enhanced ? 0.6 : 0.4,
+            color: color,
+            createdTime: Date.now(),
+            duration: 0.5
+        });
+    }
+    
+    // 創建子彈粒子效果
+    createBulletParticles(bullet, deltaTime) {
+        // 控制粒子生成頻率
+        if (Math.random() > (bullet.enhanced ? 0.8 : 0.3)) return;
+        
+        // 計算子彈後方位置
+        const angle = Math.atan2(bullet.vy, bullet.vx);
+        const backX = bullet.x - Math.cos(angle) * bullet.size * 2;
+        const backY = bullet.y - Math.sin(angle) * bullet.size * 2;
+        
+        const particleCount = bullet.enhanced ? Math.floor(Math.random() * 3) + 2 : 1;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const spreadAngle = angle + Math.PI + (Math.random() - 0.5) * 0.5;
+            const speed = 50 + Math.random() * 50;
+            
+            this.game.particleManager.addParticle(backX, backY, {
+                vx: Math.cos(spreadAngle) * speed,
+                vy: Math.sin(spreadAngle) * speed,
+                life: 0.3,
+                color: bullet.enhanced ? this.getDynamicColor(bullet) : bullet.color,
+                size: Math.random() * 2 + 1,
+                type: 'bullet_trail',
+                glow: true,
+                fade: true,
+                friction: 0.98
+            });
+        }
+    }
+    
+    // 獲取動態變化的顏色
+    getDynamicColor(bullet) {
+        const time = Date.now() * 0.005;
+        const bulletId = bullet.id || 0; // 防止 undefined
+        const hue = Math.floor((time + bulletId * 100) % 360);
+        
+        // 確保 hue 是有效數字
+        if (isNaN(hue)) {
+            return '#ff00ff'; // 回退到固定顏色
+        }
+        
+        return `hsl(${hue}, 100%, 60%)`;
+    }
+    
+    // 增強版子彈渲染
+    renderEnhancedBullet(ctx, bullet) {
         ctx.save();
         
-        // 恢復多層光束效果（但減少層數）
-        for (let i = 0; i < bullet.trail.length - 1; i++) {
-            const point = bullet.trail[i];
-            const nextPoint = bullet.trail[i + 1];
-            
-            // 恢復多層效果（偳2層）
-            for (let layer = 0; layer < 2; layer++) {
-                ctx.globalAlpha = point.life * (0.4 - layer * 0.1);
-                ctx.strokeStyle = layer === 0 ? '#ffffff' : bullet.color;
-                ctx.lineWidth = (bullet.size * 0.6) * (1 + layer * 0.3);
-                ctx.lineCap = 'round';
+        const time = Date.now() * 0.001;
+        const pulse = 1 + Math.sin(time * 10 + bullet.x * 0.01) * 0.1;
+        const bulletCount = this.bullets.filter(b => b.active).length;
+        
+        // LOD系統：根據子彈數量調整渲染細節
+        const shouldSimplify = bulletCount > 50;
+        const shouldUseMinimal = bulletCount > 100;
+        
+        if (shouldUseMinimal) {
+            // 極簡模式：直接調用簡化渲染
+            this.renderSimplifiedBullet(ctx, bullet);
+            ctx.restore();
+            return;
+        }
+        
+        // 獲取子彈顏色
+        const bulletColor = bullet.enhanced ? this.getDynamicColor(bullet) : bullet.color;
+        
+        // 多層光暈效果（可能簡化）
+        if (bullet.glow) {
+            if (shouldSimplify) {
+                // 簡化模式：只渲染一層光暈
+                const glowSize = bullet.size * 2.5;
+                const gradient = ctx.createRadialGradient(
+                    bullet.x, bullet.y, 0,
+                    bullet.x, bullet.y, glowSize * pulse
+                );
+                gradient.addColorStop(0, this.adjustAlpha(bulletColor, 0.6));
+                gradient.addColorStop(1, 'transparent');
                 
-                // 偶爾故障效果
-                if (Math.random() < 0.08) {
-                    ctx.setLineDash([3, 2]);
-                }
-                
+                ctx.fillStyle = gradient;
+                ctx.globalAlpha = 0.4;
                 ctx.beginPath();
-                ctx.moveTo(point.x, point.y);
-                ctx.lineTo(nextPoint.x, nextPoint.y);
-                ctx.stroke();
-                ctx.setLineDash([]);
+                ctx.arc(bullet.x, bullet.y, glowSize * pulse, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // 完整模式：多層光暈
+                // 第一層：外層柔和光暈
+                const outerSize = bullet.size * 4;
+                const outerGradient = ctx.createRadialGradient(
+                    bullet.x, bullet.y, 0,
+                    bullet.x, bullet.y, outerSize * pulse
+                );
+                outerGradient.addColorStop(0, this.adjustAlpha(bulletColor, 0.6));
+                outerGradient.addColorStop(0.5, this.adjustAlpha(bulletColor, 0.3));
+                outerGradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = outerGradient;
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, outerSize * pulse, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 第二層：中層強光暈
+                const midSize = bullet.size * 2.5;
+                const midGradient = ctx.createRadialGradient(
+                    bullet.x, bullet.y, 0,
+                    bullet.x, bullet.y, midSize * pulse
+                );
+                midGradient.addColorStop(0, this.adjustAlpha(bulletColor, 0.8));
+                midGradient.addColorStop(0.7, this.adjustAlpha(bulletColor, 0.2));
+                midGradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = midGradient;
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, midSize * pulse, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
         
-        // 恢復數據流效果（但簡化）
-        if (bullet.trail.length > 3) {
-            ctx.globalAlpha = 0.3;
-            ctx.strokeStyle = bullet.color;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([2, 3]);
-            
-            ctx.beginPath();
-            bullet.trail.forEach((point, i) => {
-                if (i === 0) ctx.moveTo(point.x, point.y);
-                else ctx.lineTo(point.x, point.y);
-            });
-            ctx.stroke();
-            ctx.setLineDash([]);
+        // 子彈主體
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = bulletColor;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = bulletColor;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.size * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 內部旋轉核心（僅在非簡化模式下渲染）
+        if (!shouldSimplify) {
+            this.renderBulletCore(ctx, bullet, pulse, time);
+        }
+        
+        // 大招子彈的特殊效果（僅在完整模式下渲染）
+        if (bullet.enhanced && !shouldSimplify) {
+            this.renderEnhancedEffects(ctx, bullet, pulse, time);
         }
         
         ctx.restore();
     }
     
-    // 恢復完整的賽博龐克彈幕渲染
-    renderCyberpunkBullet(ctx, bullet) {
+    // 渲染子彈核心
+    renderBulletCore(ctx, bullet, pulse, time) {
         ctx.save();
         
-        const time = Date.now() * 0.001;
-        const pulse = 1 + Math.sin(time * 10 + bullet.x * 0.01) * 0.1;
+        ctx.translate(bullet.x, bullet.y);
+        const rotation = time * (bullet.enhanced ? 10 : 3);
+        ctx.rotate(rotation);
         
-        // 恢復多層霓虹光暈
-        if (bullet.glow) {
-            const glowSize = bullet.size * 3; // 稍微縮小但保持效果
-            
-            // 外層光暈
-            const outerGradient = ctx.createRadialGradient(
-                bullet.x, bullet.y, 0,
-                bullet.x, bullet.y, glowSize * pulse
-            );
-            outerGradient.addColorStop(0, this.adjustAlpha(bullet.color, 0.8));
-            outerGradient.addColorStop(0.3, this.adjustAlpha(bullet.color, 0.4));
-            outerGradient.addColorStop(0.7, this.adjustAlpha(bullet.color, 0.1));
-            outerGradient.addColorStop(1, 'transparent');
-            
-            ctx.fillStyle = outerGradient;
-            ctx.globalAlpha = 0.6;
-            ctx.beginPath();
-            ctx.arc(bullet.x, bullet.y, glowSize * pulse, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        // 能量核心圓形
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = bullet.color;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = bullet.color;
-        ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, bullet.size * pulse, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 內部高光
+        // 白色核心光芒
         ctx.fillStyle = '#ffffff';
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.8;
         ctx.shadowBlur = 5;
         ctx.shadowColor = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(
-            bullet.x - bullet.size * 0.3,
-            bullet.y - bullet.size * 0.3,
-            bullet.size * 0.4,
-            0, Math.PI * 2
-        );
-        ctx.fill();
         
-        // 恢復數位環效果
-        ctx.globalAlpha = 0.8;
-        ctx.strokeStyle = this.adjustAlpha(bullet.color, 0.8);
-        ctx.lineWidth = 1;
-        ctx.setLineDash([2, 2]);
-        ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, bullet.size * 1.5 * pulse, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // 恢復掃描線效果
-        if (Math.random() < 0.15) {
-            ctx.globalAlpha = 0.6;
-            ctx.strokeStyle = bullet.color;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(bullet.x - bullet.size * 2, bullet.y);
-            ctx.lineTo(bullet.x + bullet.size * 2, bullet.y);
-            ctx.stroke();
+        if (bullet.enhanced) {
+            // 大招子彈：複雜八芒星
+            this.drawStar(ctx, 0, 0, 8, bullet.size * 0.6 * pulse, bullet.size * 0.3 * pulse);
+        } else {
+            // 普通子彈：簡單十字
+            const coreSize = bullet.size * 0.4 * pulse;
+            ctx.fillRect(-coreSize, -coreSize * 0.3, coreSize * 2, coreSize * 0.6);
+            ctx.fillRect(-coreSize * 0.3, -coreSize, coreSize * 0.6, coreSize * 2);
         }
         
         ctx.restore();
+    }
+    
+    // 渲染大招特殊效果
+    renderEnhancedEffects(ctx, bullet, pulse, time) {
+        // 能量電弧
+        if (Math.random() < 0.3) {
+            ctx.save();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.6;
+            ctx.lineCap = 'round';
+            
+            for (let i = 0; i < 2; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const startRadius = bullet.size * pulse;
+                const endRadius = startRadius + 10 + Math.random() * 10;
+                
+                ctx.beginPath();
+                ctx.moveTo(
+                    bullet.x + Math.cos(angle) * startRadius,
+                    bullet.y + Math.sin(angle) * startRadius
+                );
+                ctx.lineTo(
+                    bullet.x + Math.cos(angle) * endRadius + (Math.random() - 0.5) * 5,
+                    bullet.y + Math.sin(angle) * endRadius + (Math.random() - 0.5) * 5
+                );
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    }
+    
+    // 繪製星形
+    drawStar(ctx, x, y, spikes, outerRadius, innerRadius) {
+        let rot = Math.PI / 2 * 3;
+        const step = Math.PI / spikes;
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y - outerRadius);
+        
+        for (let i = 0; i < spikes; i++) {
+            const outerX = x + Math.cos(rot) * outerRadius;
+            const outerY = y + Math.sin(rot) * outerRadius;
+            ctx.lineTo(outerX, outerY);
+            rot += step;
+            
+            const innerX = x + Math.cos(rot) * innerRadius;
+            const innerY = y + Math.sin(rot) * innerRadius;
+            ctx.lineTo(innerX, innerY);
+            rot += step;
+        }
+        
+        ctx.lineTo(x, y - outerRadius);
+        ctx.closePath();
+        ctx.fill();
     }
     
     // 簡化的彈幕渲染（LOD模式）
@@ -1228,12 +1372,32 @@ class BulletSystem {
     
     // 工具方法：調整顏色透明度
     adjustAlpha(color, alpha) {
-        // 簡單的 hex 顏色轉 rgba
-        const hex = color.replace('#', '');
-        const r = parseInt(hex.substr(0, 2), 16);
-        const g = parseInt(hex.substr(2, 2), 16);
-        const b = parseInt(hex.substr(4, 2), 16);
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        // 處理 HSL 顏色
+        if (color.startsWith('hsl(')) {
+            const hslMatch = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+            if (hslMatch) {
+                const [, h, s, l] = hslMatch;
+                return `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
+            }
+        }
+        
+        // 處理 hex 顏色
+        if (color.startsWith('#')) {
+            const hex = color.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // 檢查是否有效
+            if (isNaN(r) || isNaN(g) || isNaN(b)) {
+                return `rgba(255, 255, 255, ${alpha})`; // 回退到白色
+            }
+            
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+        
+        // 回退情況
+        return `rgba(255, 255, 255, ${alpha})`;
     }
     
     // === 方向性攻擊方法 ===
@@ -1243,21 +1407,58 @@ class BulletSystem {
         const upgradeEffects = this.base.game.upgradeSystem ? this.base.game.upgradeSystem.getEffects() : {};
         const damageMultiplier = upgradeEffects.damageMultiplier || 1.0;
         
+        // 計算散射彈數（和基地攻擊使用相同邏輯）
+        const multiplier = upgradeEffects.rangeMultiplier || 1;
+        let projectileCount = 1;
+        if (multiplier >= 6.0) {
+            projectileCount = 5; // 4層升級 = 5發
+        } else if (multiplier >= 4.5) {
+            projectileCount = 4; // 3層升級 = 4發
+        } else if (multiplier >= 3.0) {
+            projectileCount = 3; // 2層升級 = 3發
+        } else if (multiplier >= 1.5) {
+            projectileCount = 2; // 1層升級 = 2發
+        }
+        
         // 計算從貓咪邊緣發射的位置
         const fireDistance = this.base.radius * 0.8;
         const fireX = this.base.x + Math.cos(angle) * fireDistance;
         const fireY = this.base.y + Math.sin(angle) * fireDistance;
         
-        this.createBullet({
-            x: fireX,
-            y: fireY,
-            angle: angle,
-            speed: pattern.speed,
-            damage: pattern.damage * (1 + this.combo * 0.05) * damageMultiplier,
-            size: pattern.size,
-            color: pattern.color,
-            glow: pattern.glow
-        });
+        // 創建散射攻擊
+        for (let i = 0; i < projectileCount; i++) {
+            let targetAngle = angle;
+            
+            if (projectileCount > 1) {
+                if (projectileCount % 2 === 1) {
+                    // 奇數彈數：中心有一發，其他對稱分布
+                    const centerIndex = Math.floor(projectileCount / 2);
+                    if (i !== centerIndex) {
+                        const spreadAngle = Math.PI / 8; // 22.5度範圍
+                        const sideIndex = i < centerIndex ? i - centerIndex : i - centerIndex;
+                        targetAngle = angle + sideIndex * (spreadAngle / Math.floor(projectileCount / 2));
+                    }
+                } else {
+                    // 偶數彈數：對稱分布，無正中心
+                    const spreadAngle = Math.PI / 8; // 22.5度範圍
+                    const angleStep = spreadAngle / (projectileCount / 2);
+                    const side = i < projectileCount / 2 ? -1 : 1;
+                    const offset = (i % (projectileCount / 2) + 0.5) * angleStep;
+                    targetAngle = angle + side * offset;
+                }
+            }
+            
+            this.createBullet({
+                x: fireX,
+                y: fireY,
+                angle: targetAngle,
+                speed: pattern.speed,
+                damage: pattern.damage * (1 + this.combo * 0.05) * damageMultiplier,
+                size: pattern.size,
+                color: pattern.color,
+                glow: pattern.glow
+            });
+        }
     }
     
     // 散射方向性攻擊
@@ -1265,18 +1466,31 @@ class BulletSystem {
         const upgradeEffects = this.base.game.upgradeSystem ? this.base.game.upgradeSystem.getEffects() : {};
         const damageMultiplier = upgradeEffects.damageMultiplier || 1.0;
         
+        // 升級增強散射效果：增加彈數和擴大角度
+        const multiplier = upgradeEffects.rangeMultiplier || 1;
+        let bulletCount = pattern.bulletCount;
+        let spreadAngle = pattern.spreadAngle;
+        
+        if (multiplier >= 1.5) {
+            // 升級時增加彈數和擴散角度
+            const upgradeLevel = Math.min(Math.floor((multiplier - 0.5) / 1.5), 4);
+            bulletCount = pattern.bulletCount + upgradeLevel * 2; // 每級增加2發
+            spreadAngle = pattern.spreadAngle * (1 + upgradeLevel * 0.3); // 每級增加30%角度
+        }
+        
         // 從貓咪朝向目標方向的邊緣發射
         const fireDistance = this.base.radius * 0.7;
         const fireX = this.base.x + Math.cos(angle) * fireDistance;
         const fireY = this.base.y + Math.sin(angle) * fireDistance;
         
-        for (let i = 0; i < pattern.bulletCount; i++) {
-            const spreadAngle = angle + (i - pattern.bulletCount / 2) * (pattern.spreadAngle / pattern.bulletCount);
+        for (let i = 0; i < bulletCount; i++) {
+            const angleOffset = (i - bulletCount / 2) * (spreadAngle / bulletCount);
+            const bulletAngle = angle + angleOffset;
             
             this.createBullet({
                 x: fireX,
                 y: fireY,
-                angle: spreadAngle,
+                angle: bulletAngle,
                 speed: pattern.speed,
                 damage: pattern.damage * (1 + this.combo * 0.05) * damageMultiplier,
                 size: pattern.size,
@@ -1292,12 +1506,21 @@ class BulletSystem {
         const upgradeEffects = this.base.game.upgradeSystem ? this.base.game.upgradeSystem.getEffects() : {};
         const damageMultiplier = upgradeEffects.damageMultiplier || 1.0;
         
+        // 升級增強螺旋效果：增加螺旋臂數量
+        const multiplier = upgradeEffects.rangeMultiplier || 1;
+        let spiralArms = 3; // 基礎3臂螺旋
+        
+        if (multiplier >= 1.5) {
+            const upgradeLevel = Math.min(Math.floor((multiplier - 0.5) / 1.5), 4);
+            spiralArms = 3 + upgradeLevel; // 每級增加1臂
+        }
+        
         // 在基礎角度周圍創建螺旋
         const spiralOffset = this.spiralAngle * pattern.spiralSpeed;
         this.spiralAngle += 0.2;
         
-        for (let i = 0; i < 3; i++) {
-            const angle = baseAngle + spiralOffset + (i * Math.PI * 2 / 3);
+        for (let i = 0; i < spiralArms; i++) {
+            const angle = baseAngle + spiralOffset + (i * Math.PI * 2 / spiralArms);
             
             // 從貓咪周圍不同位置發射
             const fireDistance = this.base.radius * 0.6;
@@ -1322,9 +1545,20 @@ class BulletSystem {
         const upgradeEffects = this.base.game.upgradeSystem ? this.base.game.upgradeSystem.getEffects() : {};
         const damageMultiplier = upgradeEffects.damageMultiplier || 1.0;
         
+        // 升級增強環形攻擊：增加主攻擊和環形彈數
+        const multiplier = upgradeEffects.rangeMultiplier || 1;
+        let mainBullets = 5;
+        let ringBullets = pattern.bulletCount;
+        
+        if (multiplier >= 1.5) {
+            const upgradeLevel = Math.min(Math.floor((multiplier - 0.5) / 1.5), 4);
+            mainBullets = 5 + upgradeLevel * 2; // 每級主攻擊增加2發
+            ringBullets = pattern.bulletCount + upgradeLevel * 4; // 每級環形增加4發
+        }
+        
         // 主要攻擊：朝滑鼠方向的強化彈幕
-        for (let i = 0; i < 5; i++) {
-            const angle = baseAngle + (i - 2) * 0.1; // 主方向的密集攻擊
+        for (let i = 0; i < mainBullets; i++) {
+            const angle = baseAngle + (i - mainBullets/2) * 0.08; // 主方向的密集攻擊
             const fireDistance = this.base.radius * 0.8;
             const fireX = this.base.x + Math.cos(angle) * fireDistance;
             const fireY = this.base.y + Math.sin(angle) * fireDistance;
@@ -1333,7 +1567,7 @@ class BulletSystem {
                 x: fireX,
                 y: fireY,
                 angle: angle,
-                speed: pattern.speed + i * 20,
+                speed: pattern.speed + i * 15,
                 damage: pattern.damage * (1 + this.combo * 0.1) * damageMultiplier,
                 size: pattern.size + Math.sin(Date.now() * 0.01 + i) * 1,
                 color: pattern.color,
@@ -1343,8 +1577,8 @@ class BulletSystem {
         }
         
         // 輔助攻擊：360度環形攻擊（威力較小）
-        for (let i = 0; i < pattern.bulletCount; i++) {
-            const angle = (Math.PI * 2 / pattern.bulletCount) * i;
+        for (let i = 0; i < ringBullets; i++) {
+            const angle = (Math.PI * 2 / ringBullets) * i;
             const fireDistance = this.base.radius * 0.9;
             const fireX = this.base.x + Math.cos(angle) * fireDistance;
             const fireY = this.base.y + Math.sin(angle) * fireDistance;

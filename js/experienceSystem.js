@@ -21,9 +21,9 @@ class ExperienceSystem {
         // 等級影響升級品質
         this.qualityThresholds = {
             common: 1,    // 1級以上：普通品質
-            rare: 5,      // 5級以上：稀有品質
-            epic: 10,     // 10級以上：史詩品質
-            legendary: 20 // 20級以上：傳說品質
+            rare: 2,      // 2級以上：稀有品質
+            epic: 4,      // 4級以上：史詩品質
+            legendary: 8  // 8級以上：傳說品質
         };
         
         // 視覺效果

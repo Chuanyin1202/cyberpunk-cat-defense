@@ -195,6 +195,9 @@ class UpgradeSystem {
     applySurvivalUpgrade(upgrade) {
         const upgradeId = upgrade.id;
         
+        // 記錄升級前的最大血量
+        const oldMaxHealth = this.getMaxHealth();
+        
         // 立即效果處理
         if (upgrade.effects.immediateHeal) {
             const healAmount = this.game.gameState.lives * upgrade.effects.immediateHeal;
@@ -225,6 +228,20 @@ class UpgradeSystem {
                 stacks: 1,
                 data: upgrade
             };
+        }
+        
+        // 處理最大血量增加效果
+        if (upgrade.effects.maxHealthMultiplier) {
+            // 重建效果以獲得新的最大血量
+            this.recalculateEffects();
+            const newMaxHealth = this.getMaxHealth();
+            const healthIncrease = newMaxHealth - oldMaxHealth;
+            
+            // 增加當前血量（保持血量百分比）
+            if (healthIncrease > 0) {
+                this.game.gameState.lives += healthIncrease;
+                console.log(`最大血量增加 ${healthIncrease.toFixed(1)}，當前血量: ${Math.floor(this.game.gameState.lives)}/${Math.floor(newMaxHealth)}`);
+            }
         }
     }
     
@@ -1035,6 +1052,11 @@ class UpgradeSystem {
     
     // 獲取當前效果
     getEffects() {
+        return { ...this.cachedEffects };
+    }
+    
+    // 獲取快取效果 (別名方法)
+    getCachedEffects() {
         return { ...this.cachedEffects };
     }
     

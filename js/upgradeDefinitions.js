@@ -378,18 +378,18 @@ class UpgradeDefinitions {
         
         range_extension: {
             id: 'range_extension',
-            name: '範圍擴大',
+            name: '散射強化',
             category: 'ability',
-            description: '攻擊範圍增加15%',
+            description: '基本攻擊變為散射，增加彈藥數量',
             quality: 'common',
             minLevel: 1,
             icon: 'range',
             effects: {
-                rangeMultiplier: 1.15  // 15%增加，3層=1.52倍
+                rangeMultiplier: 1.5  // 每層增加0.5發彈藥（整數部分）
             },
             stackable: true,
-            maxStacks: 3,
-            flavorText: '更遠的射程，更廣的控制！'
+            maxStacks: 4,  // 最多4層，總計5發彈藥
+            flavorText: '一發變多發，火力全開！'
         },
         
         precision_strike: {

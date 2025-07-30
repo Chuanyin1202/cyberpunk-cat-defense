@@ -647,12 +647,119 @@ class EnemyManager {
         boss.maxHealth = boss.health;
         boss.speed *= waveInfo.speedMultiplier;
         
-        // BOSS 特殊效果
-        this.game.particleManager.createExplosion(x, y, '#ff00ff', 20);
+        // BOSS 震撼入場特效
+        this.createBossEntryEffect(x, y);
         
         this.enemies.push(boss);
         
         console.log(`BOSS 出現！血量：${boss.health}`);
+    }
+    
+    // 創建 BOSS 入場震撼特效
+    createBossEntryEffect(x, y) {
+        // 1. 螢幕震動效果
+        if (!this.game.screenShake) {
+            this.game.screenShake = {
+                intensity: 0,
+                duration: 0,
+                time: 0
+            };
+        }
+        
+        this.game.screenShake.intensity = 15;
+        this.game.screenShake.duration = 1.5;
+        this.game.screenShake.time = 0;
+        
+        // 2. 大型爆炸粒子效果
+        for (let i = 0; i < 30; i++) {
+            const angle = (Math.PI * 2 / 30) * i;
+            const speed = 200 + Math.random() * 100;
+            
+            this.game.particleManager.addParticle(x, y, {
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1.0,
+                color: i % 3 === 0 ? '#ff00ff' : (i % 3 === 1 ? '#ff0066' : '#cc00cc'),
+                size: 4 + Math.random() * 3,
+                type: 'explosion',
+                glow: true,
+                gravity: 50,
+                friction: 0.92
+            });
+        }
+        
+        // 3. 衝擊波效果
+        if (!this.game.specialEffects) {
+            this.game.specialEffects = [];
+        }
+        
+        // 多重衝擊波
+        for (let i = 0; i < 3; i++) {
+            setTimeout(() => {
+                this.game.specialEffects.push({
+                    type: 'shockwave',
+                    x: x,
+                    y: y + i * 50,  // 逐漸下移
+                    radius: 0,
+                    maxRadius: 300 + i * 100,
+                    expandSpeed: 500 - i * 50,
+                    alpha: 0.8 - i * 0.2,
+                    color: '#ff00ff',
+                    lineWidth: 5 - i,
+                    createdTime: Date.now(),
+                    duration: 1.0
+                });
+            }, i * 200);
+        }
+        
+        // 4. 警告閃爍效果
+        this.game.warningFlash = {
+            active: true,
+            color: '#ff0066',
+            alpha: 0.3,
+            duration: 1.5,
+            time: 0
+        };
+        
+        // 5. 閃電效果
+        for (let i = 0; i < 5; i++) {
+            const targetAngle = (Math.PI * 2 / 5) * i;
+            const targetX = x + Math.cos(targetAngle) * 400;
+            const targetY = y + Math.sin(targetAngle) * 400;
+            
+            this.createLightningEffect(x, y, targetX, targetY);
+        }
+    }
+    
+    // 創建閃電效果
+    createLightningEffect(x1, y1, x2, y2) {
+        const segments = 15;
+        const points = [{x: x1, y: y1}];
+        
+        for (let i = 1; i < segments; i++) {
+            const t = i / segments;
+            const baseX = x1 + (x2 - x1) * t;
+            const baseY = y1 + (y2 - y1) * t;
+            const offset = (segments / 2 - Math.abs(i - segments / 2)) * 10;
+            
+            points.push({
+                x: baseX + (Math.random() - 0.5) * offset,
+                y: baseY + (Math.random() - 0.5) * offset
+            });
+        }
+        points.push({x: x2, y: y2});
+        
+        // 添加到特效列表
+        this.game.specialEffects.push({
+            type: 'lightning',
+            points: points,
+            color: '#ff00ff',
+            alpha: 1.0,
+            lineWidth: 3,
+            createdTime: Date.now(),
+            duration: 0.3,
+            glow: true
+        });
     }
 
     render(ctx) {

@@ -2,17 +2,28 @@
 // 基地自動攻擊的彈藥系統
 
 class Projectile {
-    constructor(x, y, target) {
+    constructor(x, y, target, game = null, isScatter = false, angle = null, range = null, enemies = null) {
         this.x = x;
         this.y = y;
         this.target = target;
+        this.game = game;
+        
+        // 散射模式參數
+        this.isScatter = isScatter;
+        this.angle = angle;
+        this.range = range;
+        this.enemies = enemies;
+        this.travelDistance = 0;
         
         const config = GameConfig.PROJECTILES.base_attack;
-        this.speed = config.speed;
-        this.damage = config.damage;
+        this.baseSpeed = config.speed;
+        this.baseDamage = config.damage;
         this.color = config.color;
         this.size = config.size;
         this.type = config.type;
+        
+        // 應用升級效果
+        this.applyUpgradeEffects();
         
         this.active = true;
         this.trail = []; // 尾跡效果
@@ -22,10 +33,31 @@ class Projectile {
         this.glowIntensity = 1.0;
         this.rotationAngle = 0;
     }
+    
+    // 應用升級效果到投射物
+    applyUpgradeEffects() {
+        if (!this.game || !this.game.upgradeSystem) {
+            // 沒有升級系統時使用基礎值
+            this.speed = this.baseSpeed;
+            this.damage = this.baseDamage;
+            return;
+        }
+        
+        const effects = this.game.upgradeSystem.getCachedEffects();
+        
+        // 應用傷害倍數
+        this.damage = this.baseDamage * (effects.damageMultiplier || 1);
+        
+        // 投射物速度不受射速影響，保持基礎速度
+        this.speed = this.baseSpeed;
+        
+        // 可以在這裡添加其他效果，如暴擊等
+        this.criticalChance = effects.criticalChance || 0;
+        this.criticalMultiplier = effects.criticalMultiplier || 2.0;
+    }
 
     update(deltaTime) {
-        if (!this.active || !this.target || !this.target.active) {
-            this.active = false;
+        if (!this.active) {
             return false;
         }
 
@@ -35,21 +67,54 @@ class Projectile {
             this.trail.shift();
         }
 
-        // 追蹤目標
-        const dx = this.target.x - this.x;
-        const dy = this.target.y - this.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < 10) {
-            // 命中目標
-            this.hitTarget();
-            return true;
-        }
-
-        // 移動向目標
         const moveSpeed = this.speed * deltaTime;
-        this.x += (dx / distance) * moveSpeed;
-        this.y += (dy / distance) * moveSpeed;
+
+        if (this.isScatter) {
+            // 散射模式：直線飛行
+            this.x += Math.cos(this.angle) * moveSpeed;
+            this.y += Math.sin(this.angle) * moveSpeed;
+            this.travelDistance += moveSpeed;
+            
+            // 檢查是否超出範圍
+            if (this.travelDistance >= this.range) {
+                this.active = false;
+                return false;
+            }
+            
+            // 檢查是否命中任何敵人
+            if (this.enemies) {
+                for (const enemy of this.enemies) {
+                    if (!enemy.active) continue;
+                    
+                    const dx = enemy.x - this.x;
+                    const dy = enemy.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 15) { // 命中半徑
+                        this.hitScatterTarget(enemy);
+                        return true;
+                    }
+                }
+            }
+        } else {
+            // 追蹤模式：原有邏輯
+            if (!this.target || !this.target.active) {
+                this.active = false;
+                return false;
+            }
+
+            const dx = this.target.x - this.x;
+            const dy = this.target.y - this.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < 10) {
+                this.hitTarget();
+                return true;
+            }
+
+            this.x += (dx / distance) * moveSpeed;
+            this.y += (dy / distance) * moveSpeed;
+        }
 
         // 旋轉動畫
         this.rotationAngle += deltaTime * 10;
@@ -61,7 +126,17 @@ class Projectile {
     }
 
     hitTarget() {
-        const killed = this.target.takeDamage(this.damage);
+        let finalDamage = this.damage;
+        
+        // 檢查暴擊
+        if (this.criticalChance > 0 && Math.random() < this.criticalChance) {
+            finalDamage *= this.criticalMultiplier;
+            
+            // 暴擊視覺效果
+            this.createCriticalHitEffect();
+        }
+        
+        const killed = this.target.takeDamage(finalDamage);
         
         // 創建命中特效
         this.createHitEffect();
@@ -69,14 +144,35 @@ class Projectile {
         this.active = false;
         return killed;
     }
+    
+    hitScatterTarget(target) {
+        let finalDamage = this.damage;
+        
+        // 檢查暴擊
+        if (this.criticalChance > 0 && Math.random() < this.criticalChance) {
+            finalDamage *= this.criticalMultiplier;
+            this.createCriticalHitEffect(target);
+        }
+        
+        const killed = target.takeDamage(finalDamage);
+        
+        // 創建命中特效
+        this.createHitEffect(target);
+        
+        this.active = false;
+        return killed;
+    }
 
-    createHitEffect() {
+    createHitEffect(hitTarget = null) {
         // 命中粒子特效
         if (window.game && window.game.particleManager) {
+            // 使用傳入的目標或默認目標，如果都沒有則使用投射物當前位置
+            const target = hitTarget || this.target || { x: this.x, y: this.y };
+            
             for (let i = 0; i < 6; i++) {
                 window.game.particleManager.addParticle(
-                    this.target.x + (Math.random() - 0.5) * 20,
-                    this.target.y + (Math.random() - 0.5) * 20,
+                    target.x + (Math.random() - 0.5) * 20,
+                    target.y + (Math.random() - 0.5) * 20,
                     {
                         vx: (Math.random() - 0.5) * 100,
                         vy: (Math.random() - 0.5) * 100,
@@ -84,6 +180,29 @@ class Projectile {
                         color: this.color,
                         size: Math.random() * 3 + 1,
                         type: 'hit'
+                    }
+                );
+            }
+        }
+    }
+    
+    createCriticalHitEffect(hitTarget = null) {
+        // 暴擊特效 - 更多粒子和不同顏色
+        if (window.game && window.game.particleManager) {
+            // 使用傳入的目標或默認目標，如果都沒有則使用投射物當前位置
+            const target = hitTarget || this.target || { x: this.x, y: this.y };
+            
+            for (let i = 0; i < 12; i++) {
+                window.game.particleManager.addParticle(
+                    target.x + (Math.random() - 0.5) * 30,
+                    target.y + (Math.random() - 0.5) * 30,
+                    {
+                        vx: (Math.random() - 0.5) * 150,
+                        vy: (Math.random() - 0.5) * 150,
+                        life: 0.5,
+                        color: '#ffff00', // 黃色暴擊效果
+                        size: Math.random() * 5 + 2,
+                        type: 'critical'
                     }
                 );
             }
@@ -245,8 +364,18 @@ class ProjectileManager {
     createProjectile(x, y, target) {
         if (this.projectiles.length >= GameConfig.PERFORMANCE.MAX_PROJECTILES) return;
 
-        const projectile = new Projectile(x, y, target);
+        const projectile = new Projectile(x, y, target, this.game);
         projectile.manager = this; // 為 LOD 設定參考
+        this.projectiles.push(projectile);
+        return projectile;
+    }
+    
+    // 創建散射投射物
+    createScatterProjectile(x, y, angle, range, enemies, game) {
+        if (this.projectiles.length >= GameConfig.PERFORMANCE.MAX_PROJECTILES) return;
+
+        const projectile = new Projectile(x, y, null, game, true, angle, range, enemies);
+        projectile.manager = this;
         this.projectiles.push(projectile);
         return projectile;
     }

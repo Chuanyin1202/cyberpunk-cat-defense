@@ -30,7 +30,8 @@ class CyberpunkCatBase {
         
         // 攻擊系統
         this.lastAttackTime = 0;
-        this.attackCooldown = 500; // 0.5秒
+        this.baseAttackCooldown = 780; // 0.78秒 (再降低20%攻擊速度，總計降低44%)
+        this.attackCooldown = this.baseAttackCooldown; // 實際攻擊間隔（會被升級影響）
         this.baseAttackRange = this.radius * 3; // 基礎攻擊範圍
         this.attackRange = this.baseAttackRange; // 實際攻擊範圍（會被升級影響）
         
@@ -212,12 +213,42 @@ class CyberpunkCatBase {
         }
     }
 
+    // 更新攻擊屬性基於升級效果
+    updateAttackProperties() {
+        if (!this.game.upgradeSystem) return;
+        
+        const effects = this.game.upgradeSystem.getCachedEffects();
+        
+        // 更新攻擊冷卻時間（射速提升）
+        this.attackCooldown = this.baseAttackCooldown * (effects.fireRateMultiplier || 1);
+        
+        // 更新攻擊範圍
+        this.attackRange = this.baseAttackRange * (effects.rangeMultiplier || 1);
+        
+        // 計算散射彈數（範圍擴大變成散射效果）
+        const multiplier = effects.rangeMultiplier || 1;
+        if (multiplier >= 6.0) {
+            this.projectileCount = 5; // 4層升級 = 5發
+        } else if (multiplier >= 4.5) {
+            this.projectileCount = 4; // 3層升級 = 4發
+        } else if (multiplier >= 3.0) {
+            this.projectileCount = 3; // 2層升級 = 3發
+        } else if (multiplier >= 1.5) {
+            this.projectileCount = 2; // 1層升級 = 2發
+        } else {
+            this.projectileCount = 1; // 無升級 = 1發
+        }
+    }
+    
     // 自動攻擊敵人
     autoAttack() {
+        // 更新攻擊屬性
+        this.updateAttackProperties();
+        
         const currentTime = Date.now();
         if (currentTime - this.lastAttackTime < this.attackCooldown) return;
 
-        // 基礎攻擊範圍
+        // 攻擊範圍
         const attackRange = this.attackRange;
         
         // 尋找範圍內的敵人
@@ -229,13 +260,55 @@ class CyberpunkCatBase {
         });
 
         if (nearbyEnemies.length > 0) {
-            // 攻擊最近的敵人
-            const target = nearbyEnemies[0];
+            // 根據散射彈數攻擊
+            const projectileCount = this.projectileCount || 1;
             
-            // 使用基礎投射物攻擊
-            this.game.createProjectile(this.x, this.y, target);
+            // 選擇主要目標（最近的敵人）
+            const primaryTarget = nearbyEnemies[0];
+            const baseAngle = Math.atan2(primaryTarget.y - this.y, primaryTarget.x - this.x);
+            
+            // 創建散射攻擊
+            for (let i = 0; i < projectileCount; i++) {
+                let targetAngle = baseAngle;
+                
+                if (projectileCount > 1) {
+                    if (projectileCount % 2 === 1) {
+                        // 奇數彈數：中心有一發，其他對稱分布
+                        const centerIndex = Math.floor(projectileCount / 2);
+                        if (i !== centerIndex) {
+                            const spreadAngle = Math.PI / 8; // 22.5度範圍
+                            const sideIndex = i < centerIndex ? i - centerIndex : i - centerIndex;
+                            targetAngle = baseAngle + sideIndex * (spreadAngle / Math.floor(projectileCount / 2));
+                        }
+                    } else {
+                        // 偶數彈數：對稱分布，無正中心
+                        const spreadAngle = Math.PI / 8; // 22.5度範圍
+                        const angleStep = spreadAngle / (projectileCount / 2);
+                        const side = i < projectileCount / 2 ? -1 : 1;
+                        const offset = (i % (projectileCount / 2) + 0.5) * angleStep;
+                        targetAngle = baseAngle + side * offset;
+                    }
+                }
+                
+                // 發射散射投射物
+                this.createScatterProjectile(targetAngle, nearbyEnemies);
+            }
+            
             this.lastAttackTime = currentTime;
         }
+    }
+    
+    // 創建散射投射物
+    createScatterProjectile(angle, nearbyEnemies) {
+        // 計算投射物的直線軌跡終點
+        const projectileRange = 600; // 投射物飛行距離
+        const endX = this.x + Math.cos(angle) * projectileRange;
+        const endY = this.y + Math.sin(angle) * projectileRange;
+        
+        // 創建沿著這個角度飛行的直線投射物
+        const scatterProjectile = this.game.projectileManager.createScatterProjectile(
+            this.x, this.y, angle, projectileRange, nearbyEnemies, this.game
+        );
     }
 
     // 創建攻擊特效
@@ -255,6 +328,29 @@ class CyberpunkCatBase {
                 }
             );
         }
+        
+        // 創建能量環擴散效果
+        this.createEnergyRing();
+    }
+    
+    // 創建能量環擴散效果
+    createEnergyRing() {
+        if (!this.game.specialEffects) {
+            this.game.specialEffects = [];
+        }
+        
+        this.game.specialEffects.push({
+            type: 'energy_ring',
+            x: this.x,
+            y: this.y,
+            radius: this.radius,
+            maxRadius: this.radius + 100,
+            expandSpeed: 200,  // 每秒擴散速度
+            alpha: 0.8,
+            color: '#00ffff',
+            createdTime: Date.now(),
+            duration: 0.8  // 持續時間
+        });
     }
 
     // 基地受到傷害
