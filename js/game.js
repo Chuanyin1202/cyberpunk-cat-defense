@@ -565,10 +565,26 @@ class CyberpunkCatDefense {
     // 渲染量子漩渦效果
     renderVortexEffect(ctx, vortex) {
         const time = (Date.now() - vortex.createdTime) / 1000;
+        const progress = time / vortex.duration;
+        
+        // 計算淡入淡出效果
+        let fadeAlpha = 1;
+        const fadeInDuration = 0.3;  // 0.3秒淡入
+        const fadeOutDuration = 0.5; // 0.5秒淡出
+        
+        if (time < fadeInDuration) {
+            // 淡入階段
+            fadeAlpha = time / fadeInDuration;
+        } else if (progress > 0.8) {
+            // 淡出階段（最後20%時間）
+            fadeAlpha = (1 - progress) / 0.2;
+        }
+        
+        ctx.save();
         
         // 外圈範圍指示
         ctx.strokeStyle = vortex.color;
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 0.3 * fadeAlpha;
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
         ctx.beginPath();
@@ -579,12 +595,11 @@ class CyberpunkCatDefense {
         // 旋轉漩渦
         ctx.translate(vortex.x, vortex.y);
         ctx.rotate(time * 3);
-        ctx.globalAlpha = 0.8;
         
         // 多層螺旋
         for (let layer = 0; layer < 4; layer++) {
             ctx.strokeStyle = vortex.color;
-            ctx.globalAlpha = 0.8 - layer * 0.15;
+            ctx.globalAlpha = (0.8 - layer * 0.15) * fadeAlpha;
             ctx.lineWidth = 3 - layer * 0.5;
             
             ctx.beginPath();
@@ -601,12 +616,14 @@ class CyberpunkCatDefense {
         
         // 中心發光點
         ctx.fillStyle = '#ffffff';
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 20;
+        ctx.globalAlpha = 1 * fadeAlpha;
+        ctx.shadowBlur = 20 * fadeAlpha;
         ctx.shadowColor = vortex.color;
         ctx.beginPath();
         ctx.arc(0, 0, 5, 0, Math.PI * 2);
         ctx.fill();
+        
+        ctx.restore();
     }
     
     // 渲染時空裂隙效果

@@ -21,7 +21,7 @@ class GameConfig {
         normal: { speed: 1.5, health: 96, color: '#00ff00', size: 10, reward: 15, damage: 15 },
         fast: { speed: 3.0, health: 64, color: '#ffff00', size: 12, reward: 20, damage: 12 },
         tank: { speed: 0.8, health: 200, color: '#ff6600', size: 15, reward: 35, damage: 25 },
-        boss: { speed: 0.5, health: 1200, color: '#ff00ff', size: 35, reward: 500, damage: 50 }
+        boss: { speed: 0.5, health: 3600, color: '#ff00ff', size: 35, reward: 500, damage: 50 }
     };
 
     // 波次配置
@@ -29,13 +29,14 @@ class GameConfig {
         getWaveInfo(wave) {
             // 每 5 波出現 BOSS
             if (wave % 5 === 0) {
+                const bossLevel = Math.floor(wave / 5);
                 return {
                     name: 'BOSS 戰鬥！',
                     enemies: ['boss'],
                     spawnRate: 0,  // BOSS 只生成一個
                     enemyCount: 1,
-                    healthMultiplier: 1 + (wave / 5 - 1) * 0.5,  // BOSS 血量隨波次增加
-                    speedMultiplier: 1,
+                    healthMultiplier: 1 + (bossLevel - 1) * 0.8,  // BOSS 血量大幅增加
+                    speedMultiplier: 1 + (bossLevel - 1) * 0.2,
                     isBossWave: true
                 };
             } else if (wave <= 3) {
@@ -43,27 +44,36 @@ class GameConfig {
                     name: '新手防禦',
                     enemies: ['normal', 'fast'],
                     spawnRate: 1.5,
-                    enemyCount: (5 + wave * 2) * 2,  // 兩倍數量
-                    healthMultiplier: 1,
+                    enemyCount: 10 + wave * 4,  // 基礎數量增加
+                    healthMultiplier: 1 + (wave - 1) * 0.15,  // 即使初期也有血量成長
                     speedMultiplier: 1
                 };
             } else if (wave <= 8) {
                 return {
                     name: '加強攻勢',
                     enemies: ['normal', 'fast', 'tank'],
-                    spawnRate: 1.2,
-                    enemyCount: (8 + wave * 2) * 2,  // 兩倍數量
-                    healthMultiplier: 1.1 + (wave - 4) * 0.1,
-                    speedMultiplier: 1.1
+                    spawnRate: 1.0,  // 加快生成速度
+                    enemyCount: 20 + wave * 5,  // 數量快速增長
+                    healthMultiplier: 1.3 + (wave - 4) * 0.25,  // 血量增幅加大
+                    speedMultiplier: 1.1 + (wave - 4) * 0.05
+                };
+            } else if (wave <= 15) {
+                return {
+                    name: '精英入侵',
+                    enemies: ['tank', 'fast', 'tank', 'normal'],  // 更多坦克
+                    spawnRate: 0.8,
+                    enemyCount: 30 + wave * 6,  // 大量敵人
+                    healthMultiplier: 2.0 + (wave - 9) * 0.3,  // 血量大幅提升
+                    speedMultiplier: 1.3 + (wave - 9) * 0.08
                 };
             } else {
                 return {
-                    name: '終極挑戰',
-                    enemies: ['tank', 'fast', 'normal'],
-                    spawnRate: 0.8,
-                    enemyCount: (15 + wave) * 2,  // 兩倍數量
-                    healthMultiplier: 1.5 + wave * 0.1,
-                    speedMultiplier: 1.2 + wave * 0.05
+                    name: '地獄模式',
+                    enemies: ['tank', 'tank', 'fast', 'normal'],  // 坦克為主
+                    spawnRate: 0.6,  // 極快生成
+                    enemyCount: 50 + wave * 8,  // 海量敵人
+                    healthMultiplier: 3.5 + wave * 0.4,  // 血量爆炸性成長
+                    speedMultiplier: 1.8 + wave * 0.1
                 };
             }
         }
