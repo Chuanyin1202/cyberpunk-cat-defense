@@ -30,9 +30,9 @@ class CyberpunkCatBase {
         
         // 攻擊系統
         this.lastAttackTime = 0;
-        this.baseAttackCooldown = 780; // 0.78秒 (再降低20%攻擊速度，總計降低44%)
+        this.baseAttackCooldown = GameConstants.ANIMATION.ATTACK_COOLDOWN * 1000; // 轉換為毫秒
         this.attackCooldown = this.baseAttackCooldown; // 實際攻擊間隔（會被升級影響）
-        this.baseAttackRange = this.radius * 3; // 基礎攻擊範圍
+        this.baseAttackRange = this.radius * GameConstants.PHYSICS.BASE_ATTACK_RANGE_MULTIPLIER; // 基礎攻擊範圍
         this.attackRange = this.baseAttackRange; // 實際攻擊範圍（會被升級影響）
         
         // 創建渲染器
@@ -374,6 +374,15 @@ class CyberpunkCatBase {
                         type: 'damage'
                     }
                 );
+            }
+            
+            // 發送基地受傷事件
+            if (window.gameEventBus) {
+                window.gameEventBus.emit(GameEvents.BASE_DAMAGE, {
+                    damage: damage,
+                    remainingLives: this.game.gameState.lives,
+                    position: { x: this.x, y: this.y }
+                });
             }
         }
     }

@@ -5,7 +5,7 @@
 class ExperienceSystem {
     constructor() {
         // 經驗值數據
-        this.experience = 0;
+        this.experience = 0; // 從0開始
         this.level = 1;
         this.experienceToNextLevel = 100; // 每級需要100經驗值
         
@@ -41,8 +41,6 @@ class ExperienceSystem {
         
         // 檢查是否升級
         this.checkLevelUp();
-        
-        // console.log(`獲得 ${amount} 經驗值 (${source})`); // 移除頻繁日誌
     }
     
     // 擊殺敵人獲得經驗值
@@ -141,50 +139,81 @@ class ExperienceSystem {
         }
     }
     
-    // 渲染經驗值UI（增加控制提示和調整間距）
-    render(ctx, x = 20, y = 100) {
+    // 渲染極簡經驗值條（底部滿屏寬度）
+    render(ctx) {
+        // 每幀都渲染，確保經驗條顯示
+        
         ctx.save();
         
-        // 經驗值條背景
-        const barWidth = 180;
-        const barHeight = 6;
+        // 檢查是否是手機版本
+        const isMobile = window.innerWidth <= 768;
         
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(x, y, barWidth, barHeight);
+        // 使用遊戲配置的邏輯尺寸
+        const logicalHeight = GameConfig.CANVAS.HEIGHT;
+        const logicalWidth = GameConfig.CANVAS.WIDTH;
         
-        // 經驗值條
+        // 極簡底部經驗條
+        const barHeight = 4; // 固定高度
+        const barY = logicalHeight - barHeight; // 使用邏輯高度
+        const barWidth = logicalWidth; // 使用邏輯寬度
+        
+        // 經驗值進度
         const expProgress = this.experience / this.experienceToNextLevel;
         const qualityColor = this.getQualityColor();
         
-        ctx.fillStyle = qualityColor;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = qualityColor;
-        ctx.fillRect(x, y, barWidth * expProgress, barHeight);
+        // 背景（更深的黑色背景）
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, barY, barWidth, barHeight);
         
-        // 經驗值條邊框
-        ctx.strokeStyle = qualityColor;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, barWidth, barHeight);
+        // 經驗值條填充（確保可見）
+        if (expProgress > 0) {
+            // 先畫一個稍微亮一點的底層
+            ctx.fillStyle = this.adjustAlpha(qualityColor, 0.3);
+            ctx.fillRect(0, barY, barWidth * expProgress, barHeight);
+            
+            // 再畫主要的填充
+            ctx.fillStyle = qualityColor;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = qualityColor;
+            ctx.fillRect(0, barY, barWidth * expProgress, barHeight);
+        }
         
-        // 等級顯示在經驗條上方中間
-        ctx.font = 'bold 12px "Courier New", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = qualityColor;
-        ctx.shadowBlur = 8;
-        const barCenterX = x + barWidth / 2; // 經驗條中心位置
-        ctx.fillText(`LV.${this.level}`, barCenterX, y - 10);
+        // 整個經驗條的邊框（加粗）
+        ctx.strokeStyle = this.adjustAlpha(qualityColor, 0.8);
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, barY, barWidth, barHeight);
         
-        // 簡化顯示：數值/總數 EXP
-        ctx.font = '10px "Courier New", monospace';
+        // 頂部細邊框
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.beginPath();
+        ctx.moveTo(0, barY);
+        ctx.lineTo(barWidth, barY);
+        ctx.stroke();
+        
+        const fontSize = isMobile ? 20 : 16;
+        const expFontSize = isMobile ? 18 : 14;
+        const textY = barY - 10;
+        
+        // 等級文字（左下角，確保在安全區域內）
+        ctx.font = `bold ${fontSize}px "Courier New", monospace`;
         ctx.textAlign = 'left';
+        ctx.fillStyle = qualityColor;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'rgba(0, 0, 0, 1)';
+        ctx.fillText(`LV.${this.level}`, 15, textY);
+        
+        // 經驗值數字（右下角，確保在安全區域內）
+        ctx.textAlign = 'right';
+        ctx.font = `${expFontSize}px "Courier New", monospace`;
         ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 3;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0, 0, 0, 1)';
         ctx.fillText(
-            `${this.experience}/${this.experienceToNextLevel} EXP`, 
-            x + barWidth + 8, y + 4
+            `${this.experience}/${this.experienceToNextLevel}`, 
+            logicalWidth - 15, textY
         );
         
-        // 移除品質等級指示（不顯示COMMON等文字）
+        // 渲染完成
         
         ctx.restore();
         
@@ -197,48 +226,10 @@ class ExperienceSystem {
         this.renderExpGainAnimations(ctx);
     }
     
-    // 渲染能量條（新增方法）
+    // 能量條已整合到基地視覺效果中，此方法已棄用
     renderEnergyBar(ctx, x = 20, y = 130, currentEnergy, maxEnergy) {
-        ctx.save();
-        
-        const barWidth = 180;
-        const barHeight = 6;
-        
-        // 能量條背景
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(x, y, barWidth, barHeight);
-        
-        // 能量條進度
-        const energyProgress = currentEnergy / maxEnergy;
-        const energyColor = '#ffff00'; // 黃色能量條
-        
-        ctx.fillStyle = energyColor;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = energyColor;
-        ctx.fillRect(x, y, barWidth * energyProgress, barHeight);
-        
-        // 能量條邊框
-        ctx.strokeStyle = energyColor;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, barWidth, barHeight);
-        
-        // 能量文字
-        ctx.font = 'bold 10px "Courier New", monospace';
-        ctx.textAlign = 'left';
-        ctx.fillStyle = energyColor;
-        ctx.shadowBlur = 8;
-        ctx.fillText('ENERGY', x, y - 3);
-        
-        // 能量數值
-        ctx.font = '10px "Courier New", monospace';
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 3;
-        ctx.fillText(
-            `${Math.floor(currentEnergy)}/${maxEnergy}`, 
-            x + barWidth + 8, y + 4
-        );
-        
-        ctx.restore();
+        // 不再渲染獨立的能量條
+        // 能量現在通過基地的光暈效果顯示
     }
     
     // 渲染控制提示（經驗條和能量條之間）

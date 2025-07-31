@@ -18,47 +18,93 @@ class CyberpunkCatBaseRenderer {
         const centerX = this.base.x + shakeX;
         const centerY = this.base.y + shakeY;
 
+        // 獲取手機渲染縮放係數
+        const renderScale = this.base.game.mobileRenderScale || 1.0;
+
         // 渲染賽博龐克貓咪基地
-        this.renderNeonBase(ctx, centerX, centerY);
+        this.renderNeonBase(ctx, centerX, centerY, renderScale);
     }
 
     // 賽博龐克貓咪基地渲染 - 完整版本
-    renderNeonBase(ctx, centerX, centerY) {
+    renderNeonBase(ctx, centerX, centerY, renderScale = 1.0) {
         const healthPercent = this.base.game.gameState.lives / GameConfig.GAME.INITIAL_LIVES;
         const baseColor = this.getCyberpunkEmotionColor(this.base.emotion);
         const time = Date.now() / 1000;
+        
+        // 計算渲染用的半徑
+        const renderRadius = this.base.radius * renderScale;
+        
+        // 如果需要縮放，應用變換
+        if (renderScale !== 1.0) {
+            ctx.save();
+            ctx.scale(renderScale, renderScale);
+            // 調整中心點以補償縮放
+            centerX /= renderScale;
+            centerY /= renderScale;
+        }
 
         // 1. 數位網格背景
         this.drawCyberpunkGrid(ctx, centerX, centerY, this.base.radius * 2.5, time);
 
         // 2. 全息投影效果（已移除掃描線）
 
-        // 3. 外層數位光暈
-        const gradient1 = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.base.radius * 2);
-        gradient1.addColorStop(0, this.adjustAlpha(baseColor, 0.4));
-        gradient1.addColorStop(0.3, this.adjustAlpha(baseColor, 0.2));
-        gradient1.addColorStop(0.6, this.adjustAlpha(baseColor, 0.1));
+        // 3. 外層數位光暈（整合能量狀態）
+        let energyPercent = 0;
+        if (this.base.bulletSystem && this.base.bulletSystem.energyBar) {
+            energyPercent = this.base.bulletSystem.energyBar.current / this.base.bulletSystem.energyBar.max;
+            // 確保值在有效範圍內
+            energyPercent = Math.max(0, Math.min(1, energyPercent));
+        }
+        
+        // 根據能量調整光暈強度（增強效果）
+        const glowIntensity = 0.4 + (energyPercent * 0.6); // 0.4 到 1.0，更明顯
+        const glowRadius = this.base.radius * (2 + energyPercent * 1.5); // 2 到 3.5 倍半徑，擴大範圍
+        
+        // 混合情感色彩和能量色彩
+        const energyColor = '#ffff00'; // 能量黃色
+        const mixedColor = this.mixColors(baseColor, energyColor, energyPercent * 0.7); // 增加混合比例
+        
+        const gradient1 = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowRadius);
+        gradient1.addColorStop(0, this.adjustAlpha(mixedColor, glowIntensity));
+        gradient1.addColorStop(0.3, this.adjustAlpha(mixedColor, glowIntensity * 0.5));
+        gradient1.addColorStop(0.6, this.adjustAlpha(mixedColor, glowIntensity * 0.25));
         gradient1.addColorStop(1, 'transparent');
         ctx.fillStyle = gradient1;
-        ctx.fillRect(centerX - this.base.radius * 2, centerY - this.base.radius * 2, this.base.radius * 4, this.base.radius * 4);
+        ctx.fillRect(centerX - glowRadius, centerY - glowRadius, glowRadius * 2, glowRadius * 2);
 
-        // 4. 故障效果光環
+        // 4. 故障效果光環（能量後加速脈動）
         ctx.save();
+        const pulseSpeed = 3 + (energyPercent * 2); // 能量越高脈動越快
+        
         for (let i = 0; i < 4; i++) {
             const glitchOffset = Math.random() < 0.1 ? Math.random() * 4 - 2 : 0;
-            const scale = 1 + (Math.sin(time * 3 + i) * 0.1);
-            const alpha = 0.6 - (i * 0.15);
+            const scale = 1 + (Math.sin(time * pulseSpeed + i) * 0.1);
+            const alpha = (0.6 - (i * 0.15)) * (0.5 + energyPercent * 0.5);
 
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = baseColor;
-            ctx.strokeStyle = this.adjustAlpha(baseColor, alpha);
-            ctx.lineWidth = 2;
+            ctx.shadowBlur = 20 + (energyPercent * 10);
+            ctx.shadowColor = mixedColor;
+            ctx.strokeStyle = this.adjustAlpha(mixedColor, alpha);
+            ctx.lineWidth = 2 + (energyPercent * 2);
             ctx.setLineDash([10, 5]);
 
             ctx.beginPath();
             ctx.arc(centerX + glitchOffset, centerY, this.base.radius * scale, 0, Math.PI * 2);
             ctx.stroke();
         }
+        
+        // 能量滿後的特殊效果
+        if (energyPercent >= 0.95) {
+            ctx.strokeStyle = this.adjustAlpha('#ffff00', 0.8);
+            ctx.lineWidth = 3;
+            ctx.setLineDash([2, 8]);
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = '#ffff00';
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, this.base.radius * 1.3, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
         ctx.setLineDash([]);
         ctx.restore();
 
@@ -75,9 +121,24 @@ class CyberpunkCatBaseRenderer {
 
         // 9. 數據流粒子
         this.drawCyberpunkDataStream(ctx, centerX, centerY, this.base.radius, baseColor, healthPercent);
+        
+        // 9.5 能量粒子環繞效果（降低門檻，讓效果更明顯）
+        if (energyPercent > 0.2) {
+            this.drawEnergyParticles(ctx, centerX, centerY, this.base.radius, energyPercent);
+        }
 
         // 10. 貓尾巴狀態指示器
         this.drawCatTailIndicator(ctx, centerX, centerY, this.base.radius, healthPercent);
+        
+        // 10.5 能量數值顯示（基地下方）
+        if (this.base.bulletSystem && energyPercent > 0) {
+            this.drawEnergyIndicator(ctx, centerX, centerY, energyPercent);
+        }
+        
+        // 恢復變換
+        if (renderScale !== 1.0) {
+            ctx.restore();
+        }
         
         // 11. 攻擊系統效果已移除
         
@@ -203,6 +264,12 @@ class CyberpunkCatBaseRenderer {
 
     // 繪製貓咪表情
     drawCatFace(ctx, centerX, centerY, baseColor) {
+        // 獲取能量狀態（用於微調表情，但不覆蓋主要情感）
+        let energyPercent = 0;
+        if (this.base.bulletSystem && this.base.bulletSystem.energyBar) {
+            energyPercent = this.base.bulletSystem.energyBar.current / this.base.bulletSystem.energyBar.max;
+            energyPercent = Math.max(0, Math.min(1, energyPercent));
+        }
         ctx.save();
 
         // 應用表情偏移
@@ -231,10 +298,15 @@ class CyberpunkCatBaseRenderer {
             ctx.restore();
         }
 
-        // 主表情
-        ctx.fillStyle = '#00ffff';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#00ffff';
+        // 主表情（根據能量微調顏色，但保持情感主導）
+        let faceColor = '#00ffff';
+        if (energyPercent > 0.8 && this.base.emotion !== 'hurt' && this.base.emotion !== 'scared') {
+            // 高能量時略帶黃色，但不影響受傷或害怕的表情
+            faceColor = this.mixColors('#00ffff', '#ffff00', 0.3);
+        }
+        ctx.fillStyle = faceColor;
+        ctx.shadowBlur = 10 + (energyPercent * 5); // 能量越高影子越亮
+        ctx.shadowColor = faceColor;
 
         // 眨眼時的表情
         let currentExpression;
@@ -443,6 +515,122 @@ class CyberpunkCatBaseRenderer {
         const g = parseInt(hex.substr(2, 2), 16);
         const b = parseInt(hex.substr(4, 2), 16);
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    
+    // 混合兩個顏色
+    mixColors(color1, color2, ratio) {
+        const hex1 = color1.replace('#', '');
+        const hex2 = color2.replace('#', '');
+        
+        const r1 = parseInt(hex1.substr(0, 2), 16);
+        const g1 = parseInt(hex1.substr(2, 2), 16);
+        const b1 = parseInt(hex1.substr(4, 2), 16);
+        
+        const r2 = parseInt(hex2.substr(0, 2), 16);
+        const g2 = parseInt(hex2.substr(2, 2), 16);
+        const b2 = parseInt(hex2.substr(4, 2), 16);
+        
+        const r = Math.round(r1 * (1 - ratio) + r2 * ratio);
+        const g = Math.round(g1 * (1 - ratio) + g2 * ratio);
+        const b = Math.round(b1 * (1 - ratio) + b2 * ratio);
+        
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+    
+    // 繪製能量粒子
+    drawEnergyParticles(ctx, x, y, radius, energyPercent) {
+        const time = Date.now() / 1000;
+        const particleCount = Math.floor(12 * energyPercent); // 增加粒子數量
+        
+        ctx.save();
+        
+        // 能量集中環（新增）
+        if (energyPercent > 0.3) {
+            ctx.strokeStyle = this.adjustAlpha('#ffff00', energyPercent * 0.3);
+            ctx.lineWidth = 2 + energyPercent * 3;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ffff00';
+            ctx.setLineDash([5, 10]);
+            
+            const ringRadius = radius + 20 + Math.sin(time * 2) * 5;
+            ctx.beginPath();
+            ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // 能量粒子
+        ctx.font = '16px "Courier New", monospace'; // 增大符號
+        ctx.shadowBlur = 10 + energyPercent * 10;
+        ctx.shadowColor = '#ffff00';
+        
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (i / particleCount) * Math.PI * 2 + time * 0.5;
+            const distance = radius + 25 + Math.sin(time * 2 + i) * 15 * energyPercent;
+            const wobble = Math.sin(time * 4 + i * 2) * 8;
+            
+            const px = x + Math.cos(angle) * distance + wobble;
+            const py = y + Math.sin(angle) * distance;
+            
+            const alpha = 0.4 + energyPercent * 0.6 * (0.5 + Math.sin(time * 3 + i) * 0.5);
+            ctx.fillStyle = this.adjustAlpha('#ffff00', alpha);
+            
+            // 能量符號
+            const symbols = ['⚡', '✦', '◈', '◆'];
+            const symbol = symbols[Math.floor((time + i) * 1.5) % symbols.length];
+            ctx.fillText(symbol, px, py);
+        }
+        
+        // 能量溢出效果（能量高時）
+        if (energyPercent > 0.7) {
+            ctx.globalAlpha = energyPercent - 0.7;
+            for (let i = 0; i < 3; i++) {
+                const sparkAngle = time * 3 + i * 2;
+                const sparkDist = radius + 40 + i * 15;
+                const sparkX = x + Math.cos(sparkAngle) * sparkDist;
+                const sparkY = y + Math.sin(sparkAngle) * sparkDist;
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ffff00';
+                ctx.fillText('✨', sparkX, sparkY);
+            }
+        }
+        
+        ctx.restore();
+    }
+    
+    // 繪製能量指示器
+    drawEnergyIndicator(ctx, x, y, energyPercent) {
+        ctx.save();
+        
+        // 位置在基地正下方
+        const indicatorY = y + this.base.radius + 25;
+        
+        // 能量百分比文字
+        ctx.font = 'bold 14px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // 根據能量等級變色
+        let textColor = '#00ff88'; // 低能量：綠色
+        if (energyPercent > 0.6) textColor = '#ffff00'; // 高能量：黃色
+        if (energyPercent > 0.9) textColor = '#ff6600'; // 滿能量：橙色
+        
+        ctx.fillStyle = textColor;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = textColor;
+        
+        // 顯示百分比
+        const energyText = `${Math.floor(energyPercent * 100)}%`;
+        ctx.fillText(energyText, x, indicatorY);
+        
+        // 能量標籤（更小的字）
+        ctx.font = '10px "Courier New", monospace';
+        ctx.globalAlpha = 0.8;
+        ctx.fillText('ENERGY', x, indicatorY + 15);
+        
+        ctx.restore();
     }
 }
 

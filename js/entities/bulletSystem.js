@@ -65,7 +65,7 @@ class BulletSystem {
         
         // 能量條系統
         this.energyBar = {
-            current: 0,
+            current: 0,             // 初始能量為0
             max: 100,               // 能量條最大值（簡化為100）
             baseDamagePerPoint: 0.3, // 基礎每點傷害累積能量（進一步降低）
             maxDamagePerHit: 10,    // 單次命中最大能量累積
@@ -129,6 +129,7 @@ class BulletSystem {
             const dx = this.game.gameState.mouseX - this.base.x;
             const dy = this.game.gameState.mouseY - this.base.y;
             const mouseAngle = Math.atan2(dy, dx);
+            
             
             this.firePatternDirectional(this.currentPattern, mouseAngle);
             this.lastFireTime[this.currentPattern] = currentTime;
@@ -203,29 +204,56 @@ class BulletSystem {
         
         // 發射三連發
         for (let i = 0; i < 3; i++) {
-            setTimeout(() => {
-                // 從貓咪周圍隨機位置發射
-                const fireAngle = Math.random() * Math.PI * 2;
-                const fireDistance = this.base.radius * 0.8; // 從基地邊緣發射
-                const fireX = this.base.x + Math.cos(fireAngle) * fireDistance;
-                const fireY = this.base.y + Math.sin(fireAngle) * fireDistance;
-                
-                const upgradeEffects = this.base.game.upgradeSystem ? this.base.game.upgradeSystem.getEffects() : {};
-                const damageMultiplier = upgradeEffects.damageMultiplier || 1.0;
-                
-                this.createBullet({
-                    x: fireX,
-                    y: fireY,
-                    angle: angle + (Math.random() - 0.5) * 0.1,
-                    speed: pattern.speed + i * 50,
-                    damage: pattern.damage * (1 + this.combo * 0.1) * damageMultiplier,
-                    size: pattern.size,
-                    color: pattern.color,
-                    glow: pattern.glow,
-                    homing: true,
-                    target: nearestEnemy
-                });
-            }, i * 50);
+            const delay = i * 50;
+            if (window.timerManager) {
+                window.timerManager.setTimeout(() => {
+                    // 從貓咪周圍隨機位置發射
+                    const fireAngle = Math.random() * Math.PI * 2;
+                    const fireDistance = this.base.radius * 0.8; // 從基地邊緣發射
+                    const fireX = this.base.x + Math.cos(fireAngle) * fireDistance;
+                    const fireY = this.base.y + Math.sin(fireAngle) * fireDistance;
+                    
+                    const upgradeEffects = this.base.game.upgradeSystem ? this.base.game.upgradeSystem.getEffects() : {};
+                    const damageMultiplier = upgradeEffects.damageMultiplier || 1.0;
+                    
+                    this.createBullet({
+                        x: fireX,
+                        y: fireY,
+                        angle: angle + (Math.random() - 0.5) * 0.1,
+                        speed: pattern.speed + i * 50,
+                        damage: pattern.damage * (1 + this.combo * 0.1) * damageMultiplier,
+                        size: pattern.size,
+                        color: pattern.color,
+                        glow: pattern.glow,
+                        homing: true,
+                        target: nearestEnemy
+                    });
+                }, delay);
+            } else {
+                setTimeout(() => {
+                    // 從貓咪周圍隨機位置發射
+                    const fireAngle = Math.random() * Math.PI * 2;
+                    const fireDistance = this.base.radius * 0.8; // 從基地邊緣發射
+                    const fireX = this.base.x + Math.cos(fireAngle) * fireDistance;
+                    const fireY = this.base.y + Math.sin(fireAngle) * fireDistance;
+                    
+                    const upgradeEffects = this.base.game.upgradeSystem ? this.base.game.upgradeSystem.getEffects() : {};
+                    const damageMultiplier = upgradeEffects.damageMultiplier || 1.0;
+                    
+                    this.createBullet({
+                        x: fireX,
+                        y: fireY,
+                        angle: angle + (Math.random() - 0.5) * 0.1,
+                        speed: pattern.speed + i * 50,
+                        damage: pattern.damage * (1 + this.combo * 0.1) * damageMultiplier,
+                        size: pattern.size,
+                        color: pattern.color,
+                        glow: pattern.glow,
+                        homing: true,
+                        target: nearestEnemy
+                    });
+                }, delay);
+            }
         }
     }
     
@@ -355,11 +383,19 @@ class BulletSystem {
     updateBullets(deltaTime) {
         this.updateCounter = (this.updateCounter || 0) + 1;
         
+        // 定期清理陣列（每80幀清理一次）
+        if (!this.cleanupCounter) this.cleanupCounter = 0;
+        this.cleanupCounter++;
+        
+        if (this.cleanupCounter > 80) {
+            this.bullets = this.bullets.filter(bullet => bullet.active);
+            this.cleanupCounter = 0;
+        }
+        
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             const bullet = this.bullets[i];
             
             if (!bullet.active) {
-                this.bullets.splice(i, 1);
                 continue;
             }
             
@@ -549,10 +585,14 @@ class BulletSystem {
         // console.log('🔥 能量條滿！自動觸發華麗攻擊！'); // 能量條觸發不頻繁，可保留
     }
     
-    // 特殊攻擊 - 點擊位置（已棄用，改為能量觸發）
+    // 特殊攻擊 - 點擊位置觸發攻擊
     fireSpecialAttack(x, y) {
-        // 現在點擊不再直接觸發特殊攻擊，改為加強普通攻擊
-        console.log('點擊攻擊已改為能量條自動觸發系統');
+        // 更新滑鼠位置讓普通攻擊朝向點擊位置
+        this.game.gameState.mouseX = x;
+        this.game.gameState.mouseY = y;
+        
+        // 立即觸發一次攻擊
+        this.triggerAttack();
     }
     
     // 加強版特殊攻擊 - 能量條觸發
@@ -566,25 +606,47 @@ class BulletSystem {
         ];
         
         patterns.forEach((pattern, patternIndex) => {
-            setTimeout(() => {
-                for (let i = 0; i < pattern.count; i++) {
-                    const angle = (Math.PI * 2 / pattern.count) * i + patternIndex * 0.1;
-                    
-                    this.createBullet({
-                        x: x,
-                        y: y,
-                        angle: angle + Math.random() * 0.1,
-                        speed: pattern.speed,
-                        damage: pattern.damage || 20,
-                        size: pattern.size,
-                        color: pattern.color,
-                        glow: true,
-                        piercing: true,
-                        homing: patternIndex === 0, // 第一波有追蹤能力
-                        enhanced: true // 標記為大招子彈
-                    });
-                }
-            }, pattern.delay);
+            if (window.timerManager) {
+                window.timerManager.setTimeout(() => {
+                    for (let i = 0; i < pattern.count; i++) {
+                        const angle = (Math.PI * 2 / pattern.count) * i + patternIndex * 0.1;
+                        
+                        this.createBullet({
+                            x: x,
+                            y: y,
+                            angle: angle + Math.random() * 0.1,
+                            speed: pattern.speed,
+                            damage: pattern.damage || 20,
+                            size: pattern.size,
+                            color: pattern.color,
+                            glow: true,
+                            piercing: true,
+                            homing: patternIndex === 0, // 第一波有追蹤能力
+                            enhanced: true // 標記為大招子彈
+                        });
+                    }
+                }, pattern.delay);
+            } else {
+                setTimeout(() => {
+                    for (let i = 0; i < pattern.count; i++) {
+                        const angle = (Math.PI * 2 / pattern.count) * i + patternIndex * 0.1;
+                        
+                        this.createBullet({
+                            x: x,
+                            y: y,
+                            angle: angle + Math.random() * 0.1,
+                            speed: pattern.speed,
+                            damage: pattern.damage || 20,
+                            size: pattern.size,
+                            color: pattern.color,
+                            glow: true,
+                            piercing: true,
+                            homing: patternIndex === 0, // 第一波有追蹤能力
+                            enhanced: true // 標記為大招子彈
+                        });
+                    }
+                }, pattern.delay);
+            }
         });
         
         // 強化爆炸特效
@@ -807,24 +869,45 @@ class BulletSystem {
         });
         
         // 延遲的彩色火花雨（減少數量）
-        setTimeout(() => {
-            for (let i = 0; i < 4; i++) {  // 減少到4個
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 80 + Math.random() * 30;  // 減慢速度
-                
-                this.game.particleManager.addParticle(x, y, {
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed - 30, // 向上發射
-                    life: 0.6,  // 縮短生命週期
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    size: 1.5 + Math.random() * 0.5,  // 更小尺寸 (1.5-2)
-                    type: 'firework_trail',
-                    glow: true,
-                    gravity: 180,  // 增加重力
-                    friction: 0.96  // 增加摩擦
-                });
-            }
-        }, 80);  // 縮短延遲
+        if (window.timerManager) {
+            window.timerManager.setTimeout(() => {
+                for (let i = 0; i < 4; i++) {  // 減少到4個
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 80 + Math.random() * 30;  // 減慢速度
+                    
+                    this.game.particleManager.addParticle(x, y, {
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 30, // 向上發射
+                        life: 0.6,  // 縮短生命週期
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        size: 1.5 + Math.random() * 0.5,  // 更小尺寸 (1.5-2)
+                        type: 'firework_trail',
+                        glow: true,
+                        gravity: 180,  // 增加重力
+                        friction: 0.96  // 增加摩擦
+                    });
+                }
+            }, 80);  // 縮短延遲
+        } else {
+            setTimeout(() => {
+                for (let i = 0; i < 4; i++) {  // 減少到4個
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 80 + Math.random() * 30;  // 減慢速度
+                    
+                    this.game.particleManager.addParticle(x, y, {
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 30, // 向上發射
+                        life: 0.6,  // 縮短生命週期
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        size: 1.5 + Math.random() * 0.5,  // 更小尺寸 (1.5-2)
+                        type: 'firework_trail',
+                        glow: true,
+                        gravity: 180,  // 增加重力
+                        friction: 0.96  // 增加摩擦
+                    });
+                }
+            }, 80);  // 縮短延遲
+        }
     }
     
     // 恢復完整的爆炸特效
@@ -880,43 +963,81 @@ class BulletSystem {
         });
         
         // 恢復延遲的彩色火花雨（減少數量）
-        setTimeout(() => {
-            for (let i = 0; i < 3; i++) {  // 減少到3個
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 60 + Math.random() * 20;  // 大幅減慢
-                
-                this.game.particleManager.addParticle(x, y, {
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed - 20,
-                    life: 0.4,  // 大幅縮短
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    size: 1 + Math.random() * 0.5,  // 很小 (1-1.5)
-                    type: 'firework_trail',
-                    glow: true,
-                    gravity: 200,
-                    friction: 0.94
-                });
-            }
-        }, 50);  // 縮短延遲
+        if (window.timerManager) {
+            window.timerManager.setTimeout(() => {
+                for (let i = 0; i < 3; i++) {  // 減少到3個
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 60 + Math.random() * 20;  // 大幅減慢
+                    
+                    this.game.particleManager.addParticle(x, y, {
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 20,
+                        life: 0.4,  // 大幅縮短
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        size: 1 + Math.random() * 0.5,  // 很小 (1-1.5)
+                        type: 'firework_trail',
+                        glow: true,
+                        gravity: 200,
+                        friction: 0.94
+                    });
+                }
+            }, 50);  // 縮短延遲
+        } else {
+            setTimeout(() => {
+                for (let i = 0; i < 3; i++) {  // 減少到3個
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 60 + Math.random() * 20;  // 大幅減慢
+                    
+                    this.game.particleManager.addParticle(x, y, {
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 20,
+                        life: 0.4,  // 大幅縮短
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        size: 1 + Math.random() * 0.5,  // 很小 (1-1.5)
+                        type: 'firework_trail',
+                        glow: true,
+                        gravity: 200,
+                        friction: 0.94
+                    });
+                }
+            }, 50);  // 縮短延遲
+        }
     }
     
     // 能量波特效
     createEnergyWaveEffect(x, y) {
         // 進一步縮小的能量波特效
         for (let wave = 0; wave < 2; wave++) {  // 減少到2個波
-            setTimeout(() => {
-                this.game.particleManager.addParticle(x, y, {
-                    vx: 0,
-                    vy: 0,
-                    life: 0.5,  // 縮短生命週期
-                    color: '#ffffff',
-                    size: 5 + wave * 8, // 更小：5, 13 像素
-                    type: 'energy_wave',
-                    glow: true,
-                    fade: true,
-                    expand: true
-                });
-            }, wave * 30);
+            const delay = wave * 30;
+            if (window.timerManager) {
+                window.timerManager.setTimeout(() => {
+                    this.game.particleManager.addParticle(x, y, {
+                        vx: 0,
+                        vy: 0,
+                        life: 0.5,  // 縮短生命週期
+                        color: '#ffffff',
+                        size: 5 + wave * 8, // 更小：5, 13 像素
+                        type: 'energy_wave',
+                        glow: true,
+                        fade: true,
+                        expand: true
+                    });
+                }, delay);
+            } else {
+                setTimeout(() => {
+                    this.game.particleManager.addParticle(x, y, {
+                        vx: 0,
+                        vy: 0,
+                        life: 0.5,  // 縮短生命週期
+                        color: '#ffffff',
+                        size: 5 + wave * 8, // 更小：5, 13 像素
+                        type: 'energy_wave',
+                        glow: true,
+                        fade: true,
+                        expand: true
+                    });
+                }, delay);
+            }
         }
     }
     
@@ -976,8 +1097,8 @@ class BulletSystem {
             this.renderCyberpunkCombo(ctx);
         }
         
-        // 渲染能量條
-        this.renderEnergyBar(ctx);
+        // 能量條已整合到基地視覺效果中，不再單獨渲染
+        // this.renderEnergyBar(ctx);
     }
     
     // 更新子彈特效系統
@@ -1425,6 +1546,17 @@ class BulletSystem {
         const fireX = this.base.x + Math.cos(angle) * fireDistance;
         const fireY = this.base.y + Math.sin(angle) * fireDistance;
         
+        // 檢查角度和位置
+        const dx = this.game.gameState.mouseX - this.base.x;
+        const dy = this.game.gameState.mouseY - this.base.y;
+        const actualAngle = Math.atan2(dy, dx);
+        
+        // 將角度轉換為時鐘方向（0度是3點鐘，90度是6點鐘）
+        let clockAngle = angle * 180 / Math.PI;
+        // 轉換為時鐘方向：3點鐘是0度，6點鐘是90度，9點鐘是180度，12點鐘是-90度
+        if (clockAngle < 0) clockAngle += 360;
+        
+        
         // 創建散射攻擊
         for (let i = 0; i < projectileCount; i++) {
             let targetAngle = angle;
@@ -1604,7 +1736,14 @@ class BulletSystem {
         const barWidth = 180;
         const barHeight = 6;
         const barX = ctx.canvas.width / 2 - 90; // 底部中央位置
-        const barY = ctx.canvas.height - 80 + 20; // 在經驗條下方，縮短間距
+        
+        // 考慮手機安全區域
+        const game = window.currentGame;
+        const isMobilePortrait = game?.isPortraitMode || false;
+        const baseY = isMobilePortrait ? 
+            ctx.canvas.height - 120 : // 手機豎屏模式留更多空間
+            ctx.canvas.height - 80;   // 桌面模式
+        const barY = baseY + 20; // 在經驗條下方，縮短間距
         
         const energyPercent = this.energyBar.current / this.energyBar.max;
         

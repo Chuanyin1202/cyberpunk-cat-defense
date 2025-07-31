@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>記憶體洩漏測試 - 賽博龐克貓咪塔防</title>
+    <style>
+        body {
+            background: #0a0a0a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+        }
+        
+        #testStatus {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        
+        .test-button {
+            background: rgba(0, 255, 0, 0.2);
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .test-button:hover {
+            background: rgba(0, 255, 0, 0.4);
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #00ffff;
+            padding-left: 10px;
+        }
+        
+        .warning {
+            color: #ffff00;
+        }
+        
+        .error {
+            color: #ff0066;
+        }
+        
+        .success {
+            color: #00ff88;
+        }
+        
+        iframe {
+            border: 2px solid #00ffff;
+            width: 100%;
+            height: 600px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 記憶體洩漏測試工具</h1>
+    
+    <div>
+        <button class="test-button" onclick="startTest()">開始測試</button>
+        <button class="test-button" onclick="stopTest()">停止測試</button>
+        <button class="test-button" onclick="checkMemory()">檢查記憶體</button>
+        <button class="test-button" onclick="clearLogs()">清除日誌</button>
+    </div>
+    
+    <div id="testStatus">
+        <h3>測試狀態</h3>
+        <div id="statusLog"></div>
+    </div>
+    
+    <iframe id="gameFrame" src="index.html"></iframe>
+    
+    <script>
+        let testInterval = null;
+        let restartCount = 0;
+        let memoryReadings = [];
+        const logDiv = document.getElementById('statusLog');
+        
+        function log(message, type = '') {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function startTest() {
+            log('開始記憶體洩漏測試...', 'success');
+            restartCount = 0;
+            memoryReadings = [];
+            
+            // 每30秒重新載入遊戲
+            testInterval = setInterval(() => {
+                restartGame();
+            }, 30000);
+            
+            // 每5秒檢查記憶體
+            setInterval(() => {
+                checkMemory();
+            }, 5000);
+        }
+        
+        function stopTest() {
+            if (testInterval) {
+                clearInterval(testInterval);
+                testInterval = null;
+                log('測試已停止', 'warning');
+                analyzeResults();
+            }
+        }
+        
+        function restartGame() {
+            restartCount++;
+            log(`第 ${restartCount} 次重新載入遊戲...`);
+            
+            const frame = document.getElementById('gameFrame');
+            const gameWindow = frame.contentWindow;
+            
+            // 嘗試呼叫清理函數
+            if (gameWindow.game && gameWindow.game.cleanup) {
+                log('呼叫遊戲清理函數...');
+                gameWindow.game.cleanup();
+            }
+            
+            // 重新載入
+            frame.src = 'index.html?t=' + Date.now();
+        }
+        
+        function checkMemory() {
+            if (performance.memory) {
+                const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
+                const total = Math.round(performance.memory.totalJSHeapSize / 1048576);
+                const limit = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
+                
+                memoryReadings.push({
+                    time: Date.now(),
+                    used: used,
+                    total: total,
+                    restartCount: restartCount
+                });
+                
+                log(`記憶體使用: ${used}MB / ${total}MB (限制: ${limit}MB)`);
+                
+                // 檢查記憶體增長
+                if (memoryReadings.length > 10) {
+                    const recent = memoryReadings.slice(-10);
+                    const oldAvg = recent.slice(0, 5).reduce((a, b) => a + b.used, 0) / 5;
+                    const newAvg = recent.slice(5).reduce((a, b) => a + b.used, 0) / 5;
+                    
+                    if (newAvg > oldAvg * 1.2) {
+                        log(`⚠️ 偵測到記憶體增長: ${oldAvg.toFixed(1)}MB → ${newAvg.toFixed(1)}MB`, 'warning');
+                    }
+                }
+            } else {
+                log('瀏覽器不支援 performance.memory API', 'error');
+            }
+        }
+        
+        function analyzeResults() {
+            if (memoryReadings.length < 2) {
+                log('數據不足，無法分析', 'warning');
+                return;
+            }
+            
+            const firstReading = memoryReadings[0];
+            const lastReading = memoryReadings[memoryReadings.length - 1];
+            const memoryGrowth = lastReading.used - firstReading.used;
+            const timeElapsed = (lastReading.time - firstReading.time) / 1000 / 60; // 分鐘
+            
+            log('=== 測試結果分析 ===', 'success');
+            log(`測試時長: ${timeElapsed.toFixed(1)} 分鐘`);
+            log(`遊戲重啟次數: ${restartCount}`);
+            log(`初始記憶體: ${firstReading.used}MB`);
+            log(`最終記憶體: ${lastReading.used}MB`);
+            log(`記憶體增長: ${memoryGrowth}MB (${(memoryGrowth / firstReading.used * 100).toFixed(1)}%)`);
+            
+            if (memoryGrowth < 50) {
+                log('✅ 未發現明顯記憶體洩漏', 'success');
+            } else if (memoryGrowth < 100) {
+                log('⚠️ 發現輕微記憶體增長，可能有小型洩漏', 'warning');
+            } else {
+                log('❌ 發現嚴重記憶體洩漏！', 'error');
+            }
+        }
+        
+        function clearLogs() {
+            logDiv.innerHTML = '';
+            log('日誌已清除', 'success');
+        }
+        
+        // 初始檢查
+        log('記憶體洩漏測試工具已載入', 'success');
+        log('點擊"開始測試"按鈕開始自動化測試');
+        
+        // 檢查瀏覽器支援
+        if (!performance.memory) {
+            log('⚠️ 您的瀏覽器不支援 performance.memory API', 'warning');
+            log('請使用 Chrome 並加上 --enable-precise-memory-info 參數啟動', 'warning');
+        }
+    </script>
+</body>
+</html>

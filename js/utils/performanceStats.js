@@ -8,6 +8,9 @@ class PerformanceStats {
         this.lastStatsUpdate = 0;
         this.updateInterval = 1000; // 1秒更新一次統計
         
+        // DOM 元素引用
+        this.statsDiv = null;
+        
         // FPS 統計
         this.fps = 60;
         this.avgFps = 60;
@@ -165,35 +168,38 @@ class PerformanceStats {
     
     // 更新詳細統計顯示
     updateDetailedStats() {
-        let statsDiv = document.getElementById('performance-stats');
-        if (!statsDiv) {
-            // 創建統計顯示區域
-            statsDiv = document.createElement('div');
-            statsDiv.id = 'performance-stats';
-            statsDiv.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background: rgba(0, 0, 0, 0.8);
-                color: #00ff00;
-                font-family: 'Courier New', monospace;
-                font-size: 10px;
-                padding: 10px;
-                border: 1px solid #00ff00;
-                border-radius: 5px;
-                z-index: 1000;
-                display: none;
-                max-width: 300px;
-            `;
-            document.body.appendChild(statsDiv);
+        if (!this.statsDiv) {
+            // 只在需要時創建，並保存引用
+            this.statsDiv = document.getElementById('performance-stats');
+            if (!this.statsDiv) {
+                // 創建統計顯示區域
+                this.statsDiv = document.createElement('div');
+                this.statsDiv.id = 'performance-stats';
+                this.statsDiv.style.cssText = `
+                    position: fixed;
+                    top: 10px;
+                    right: 10px;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: #00ff00;
+                    font-family: 'Courier New', monospace;
+                    font-size: 10px;
+                    padding: 10px;
+                    border: 1px solid #00ff00;
+                    border-radius: 5px;
+                    z-index: 1000;
+                    display: none;
+                    max-width: 300px;
+                `;
+                document.body.appendChild(this.statsDiv);
+            }
         }
         
         // 只在開發模式或按下特定鍵時顯示
         if (this.shouldShowDetailedStats()) {
-            statsDiv.style.display = 'block';
-            statsDiv.innerHTML = this.generateDetailedStatsHTML();
+            this.statsDiv.style.display = 'block';
+            this.statsDiv.innerHTML = this.generateDetailedStatsHTML();
         } else {
-            statsDiv.style.display = 'none';
+            this.statsDiv.style.display = 'none';
         }
     }
     
@@ -286,6 +292,14 @@ class PerformanceStats {
             }
         }
     }
+    
+    // 清理 DOM 元素
+    cleanup() {
+        if (this.statsDiv && this.statsDiv.parentNode) {
+            this.statsDiv.parentNode.removeChild(this.statsDiv);
+            this.statsDiv = null;
+        }
+    }
 }
 
 // 創建全局性能統計實例
@@ -293,9 +307,16 @@ window.PerformanceStats = PerformanceStats;
 window.performanceStats = new PerformanceStats();
 
 // 添加鍵盤快捷鍵切換詳細統計
-document.addEventListener('keydown', (e) => {
+const performanceKeyHandler = (e) => {
     if (e.key === 'F3') {
         e.preventDefault();
         window.performanceStats.toggleDetailedStats();
     }
-});
+};
+
+document.addEventListener('keydown', performanceKeyHandler);
+
+// 提供清理方法
+window.performanceStats.cleanupKeyHandler = () => {
+    document.removeEventListener('keydown', performanceKeyHandler);
+};

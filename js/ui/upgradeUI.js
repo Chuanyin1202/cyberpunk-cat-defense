@@ -10,6 +10,9 @@ class UpgradeUI {
         this.hoverIndex = -1;
         this.callback = null;
         
+        // 事件處理器引用
+        this.eventHandlers = {};
+        
         // UI配置
         this.config = {
             cardWidth: 200,
@@ -50,30 +53,56 @@ class UpgradeUI {
     // 綁定事件
     bindEvents() {
         // 滑鼠移動事件
-        this.game.canvas.addEventListener('mousemove', (e) => {
+        this.eventHandlers.mousemove = (e) => {
             if (!this.visible) return;
             this.handleMouseMove(e);
-        });
+        };
+        this.game.canvas.addEventListener('mousemove', this.eventHandlers.mousemove);
         
         // 點擊事件
-        this.game.canvas.addEventListener('click', (e) => {
+        this.eventHandlers.click = (e) => {
             if (!this.visible) return;
             this.handleClick(e);
-        });
+        };
+        this.game.canvas.addEventListener('click', this.eventHandlers.click);
         
         // 觸控事件
-        this.game.canvas.addEventListener('touchstart', (e) => {
+        this.eventHandlers.touchstart = (e) => {
             if (!this.visible) return;
             e.preventDefault();
             const touch = e.touches[0];
             this.handleClick(touch);
-        });
+        };
+        this.game.canvas.addEventListener('touchstart', this.eventHandlers.touchstart);
         
         // 鍵盤事件
-        document.addEventListener('keydown', (e) => {
+        this.eventHandlers.keydown = (e) => {
             if (!this.visible) return;
             this.handleKeyboard(e);
-        });
+        };
+        document.addEventListener('keydown', this.eventHandlers.keydown);
+    }
+    
+    // 清理事件監聽器
+    cleanup() {
+        // 移除畫布事件
+        if (this.eventHandlers.mousemove) {
+            this.game.canvas.removeEventListener('mousemove', this.eventHandlers.mousemove);
+        }
+        if (this.eventHandlers.click) {
+            this.game.canvas.removeEventListener('click', this.eventHandlers.click);
+        }
+        if (this.eventHandlers.touchstart) {
+            this.game.canvas.removeEventListener('touchstart', this.eventHandlers.touchstart);
+        }
+        
+        // 移除文檔事件
+        if (this.eventHandlers.keydown) {
+            document.removeEventListener('keydown', this.eventHandlers.keydown);
+        }
+        
+        // 清空事件處理器引用
+        this.eventHandlers = {};
     }
     
     // 顯示升級選擇
@@ -187,12 +216,21 @@ class UpgradeUI {
         this.createSelectionEffect(index);
         
         // 延遲隱藏UI並執行回調
-        setTimeout(() => {
-            this.hide();
-            if (this.callback) {
-                this.callback(selectedUpgrade);
-            }
-        }, 300);
+        if (window.timerManager) {
+            window.timerManager.setTimeout(() => {
+                this.hide();
+                if (this.callback) {
+                    this.callback(selectedUpgrade);
+                }
+            }, 300);
+        } else {
+            setTimeout(() => {
+                this.hide();
+                if (this.callback) {
+                    this.callback(selectedUpgrade);
+                }
+            }, 300);
+        }
         
         console.log(`選擇升級: ${selectedUpgrade.name}`);
     }

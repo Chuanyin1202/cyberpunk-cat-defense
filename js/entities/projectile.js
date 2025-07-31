@@ -2,7 +2,7 @@
 // 基地自動攻擊的彈藥系統
 
 class Projectile {
-    constructor(x, y, target, game = null, isScatter = false, angle = null, range = null, enemies = null) {
+    constructor(x = 0, y = 0, target = null, game = null, isScatter = false, angle = null, range = null, enemies = null) {
         this.x = x;
         this.y = y;
         this.target = target;
@@ -15,21 +15,65 @@ class Projectile {
         this.enemies = enemies;
         this.travelDistance = 0;
         
-        const config = GameConfig.PROJECTILES.base_attack;
-        this.baseSpeed = config.speed;
-        this.baseDamage = config.damage;
-        this.color = config.color;
-        this.size = config.size;
-        this.type = config.type;
+        // 配置屬性（只在有 GameConfig 時初始化）
+        if (GameConfig && GameConfig.PROJECTILES && GameConfig.PROJECTILES.base_attack) {
+            const config = GameConfig.PROJECTILES.base_attack;
+            this.baseSpeed = config.speed;
+            this.baseDamage = config.damage;
+            this.color = config.color;
+            this.size = config.size;
+            this.type = config.type;
+        } else {
+            // 默認值（對象池初始化時使用）
+            this.baseSpeed = 0;
+            this.baseDamage = 0;
+            this.color = '#00ffff';
+            this.size = 5;
+            this.type = 'laser';
+        }
         
         // 應用升級效果
         this.applyUpgradeEffects();
         
-        this.active = true;
+        this.active = false; // 默認非活躍（對象池）
         this.trail = []; // 尾跡效果
         this.maxTrailLength = 8;
         
         // 視覺效果
+        this.glowIntensity = 1.0;
+        this.rotationAngle = 0;
+    }
+    
+    // 重置投射物狀態（用於對象池重用）
+    reset(x, y, target, game = null, isScatter = false, angle = null, range = null, enemies = null) {
+        this.x = x;
+        this.y = y;
+        this.target = target;
+        this.game = game;
+        
+        // 重置散射模式參數
+        this.isScatter = isScatter;
+        this.angle = angle;
+        this.range = range;
+        this.enemies = enemies;
+        this.travelDistance = 0;
+        
+        // 重新加載配置
+        if (GameConfig && GameConfig.PROJECTILES && GameConfig.PROJECTILES.base_attack) {
+            const config = GameConfig.PROJECTILES.base_attack;
+            this.baseSpeed = config.speed;
+            this.baseDamage = config.damage;
+            this.color = config.color;
+            this.size = config.size;
+            this.type = config.type;
+        }
+        
+        // 重新應用升級效果
+        this.applyUpgradeEffects();
+        
+        // 重置狀態
+        this.active = true;
+        this.trail = [];
         this.glowIntensity = 1.0;
         this.rotationAngle = 0;
     }
@@ -81,16 +125,19 @@ class Projectile {
                 return false;
             }
             
-            // 檢查是否命中任何敵人
-            if (this.enemies) {
-                for (const enemy of this.enemies) {
+            // 使用空間網格優化碰撞檢測
+            if (this.game && this.game.spatialGrid) {
+                // 獲取附近的敵人（檢測半徑）
+                const nearbyEnemies = this.game.spatialGrid.getNearby(this.x, this.y, GameConstants.SPATIAL_GRID.COLLISION_RADIUS);
+                
+                for (const enemy of nearbyEnemies) {
                     if (!enemy.active) continue;
                     
                     const dx = enemy.x - this.x;
                     const dy = enemy.y - this.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     
-                    if (distance < 15) { // 命中半徑
+                    if (distance < GameConstants.SPATIAL_GRID.COLLISION_RADIUS) { // 命中半徑
                         this.hitScatterTarget(enemy);
                         return true;
                     }
@@ -251,8 +298,17 @@ class Projectile {
     }
 
     drawProjectile(ctx) {
+        // 獲取手機渲染縮放係數
+        const game = window.currentGame;
+        const renderScale = game?.mobileRenderScale || 1.0;
+        
         ctx.translate(this.x, this.y);
         ctx.rotate(this.rotationAngle);
+        
+        // 應用縮放
+        if (renderScale !== 1.0) {
+            ctx.scale(renderScale, renderScale);
+        }
 
         // 簡化的發光效果
         if (this.glowIntensity > 0.3) {
@@ -319,11 +375,57 @@ class ProjectileManager {
     constructor(game) {
         this.game = game;
         this.projectiles = [];
+        this.projectilePool = []; // 對象池
+        this.maxPoolSize = 100; // 最大池大小
         this.updateCounter = 0;
+        this.activeProjectileCount = 0; // 追蹤活躍投射物數量
+        
+        // 預先創建一些投射物對象
+        this.initializePool();
+    }
+    
+    // 初始化對象池
+    initializePool() {
+        for (let i = 0; i < 20; i++) {
+            const projectile = new Projectile();
+            projectile.active = false;
+            this.projectilePool.push(projectile);
+        }
+    }
+    
+    // 從對象池獲取投射物
+    getProjectileFromPool() {
+        // 先嘗試從池中找到非活躍的投射物
+        for (let projectile of this.projectilePool) {
+            if (!projectile.active) {
+                return projectile;
+            }
+        }
+        
+        // 如果池中沒有可用的，且池大小未達上限，創建新的
+        if (this.projectilePool.length < this.maxPoolSize) {
+            const projectile = new Projectile();
+            this.projectilePool.push(projectile);
+            return projectile;
+        }
+        
+        // 如果池已滿，返回 null（限制投射物數量）
+        return null;
+    }
+    
+    // 回收投射物到對象池
+    recycleProjectile(projectile) {
+        projectile.active = false;
+        projectile.x = -100; // 移到螢幕外
+        projectile.y = -100;
+        projectile.target = null;
+        projectile.trail = [];
     }
 
     update(deltaTime) {
         this.updateCounter++;
+        this.activeProjectileCount = 0;
+        const deadProjectiles = [];
         
         // 批次處理：每幀只處理部分投射物
         const maxUpdatesPerFrame = GameConfig.PERFORMANCE.PARTICLE_BATCH_SIZE || 20;
@@ -332,9 +434,20 @@ class ProjectileManager {
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const projectile = this.projectiles[i];
             
+            // 跳過已經非活躍的投射物
+            if (!projectile.active) {
+                continue;
+            }
+            
             if (updatesThisFrame < maxUpdatesPerFrame) {
                 const hit = projectile.update(deltaTime);
                 updatesThisFrame++;
+                
+                if (!projectile.active) {
+                    deadProjectiles.push({ projectile, index: i });
+                } else {
+                    this.activeProjectileCount++;
+                }
             } else {
                 // 簡單位置更新
                 if (projectile.target && projectile.target.active) {
@@ -348,35 +461,52 @@ class ProjectileManager {
                         projectile.y += (dy / distance) * moveSpeed;
                     }
                 }
-            }
-
-            if (!projectile.active) {
-                this.projectiles.splice(i, 1);
+                this.activeProjectileCount++;
             }
         }
         
-        // 定期清理
-        if (this.updateCounter % 120 === 0) {
-            this.projectiles = this.projectiles.filter(p => p.active);
+        // 處理死亡的投射物（反向處理以確保索引正確）
+        for (let i = deadProjectiles.length - 1; i >= 0; i--) {
+            const { projectile, index } = deadProjectiles[i];
+            this.projectiles.splice(index, 1);
+            this.recycleProjectile(projectile);
         }
     }
 
     createProjectile(x, y, target) {
-        if (this.projectiles.length >= GameConfig.PERFORMANCE.MAX_PROJECTILES) return;
+        if (this.activeProjectileCount >= GameConfig.PERFORMANCE.MAX_PROJECTILES) return null;
 
-        const projectile = new Projectile(x, y, target, this.game);
+        // 從對象池獲取投射物
+        const projectile = this.getProjectileFromPool();
+        if (!projectile) return null;
+        
+        // 重置投射物狀態
+        projectile.reset(x, y, target, this.game);
         projectile.manager = this; // 為 LOD 設定參考
-        this.projectiles.push(projectile);
+        
+        // 只有當投射物不在陣列中時才添加
+        if (!this.projectiles.includes(projectile)) {
+            this.projectiles.push(projectile);
+        }
         return projectile;
     }
     
     // 創建散射投射物
     createScatterProjectile(x, y, angle, range, enemies, game) {
-        if (this.projectiles.length >= GameConfig.PERFORMANCE.MAX_PROJECTILES) return;
+        if (this.activeProjectileCount >= GameConfig.PERFORMANCE.MAX_PROJECTILES) return null;
 
-        const projectile = new Projectile(x, y, null, game, true, angle, range, enemies);
+        // 從對象池獲取投射物
+        const projectile = this.getProjectileFromPool();
+        if (!projectile) return null;
+        
+        // 重置為散射投射物
+        projectile.reset(x, y, null, game, true, angle, range, enemies);
         projectile.manager = this;
-        this.projectiles.push(projectile);
+        
+        // 只有當投射物不在陣列中時才添加
+        if (!this.projectiles.includes(projectile)) {
+            this.projectiles.push(projectile);
+        }
         return projectile;
     }
 

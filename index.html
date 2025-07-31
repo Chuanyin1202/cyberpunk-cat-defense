@@ -77,32 +77,146 @@
         
         /* 手機響應式設計 */
         @media (max-width: 768px) {
-            #gameCanvas {
+            body {
+                padding: 0;
+                margin: 0;
+                overflow: hidden;
+            }
+            
+            #gameContainer {
                 width: 100vw;
-                height: calc(100vh - 20px);
+                height: 100vh;
+                box-shadow: none;
+            }
+            
+            #gameCanvas {
+                width: 100vw !important;
+                height: 100vh !important;
+                border: none;
+                max-width: none;
+                max-height: none;
+                object-fit: cover;
+                object-position: center center;
+            }
+            
+            #ui {
+                top: 5px;
+                left: 5px;
+                right: 5px;
+                bottom: auto;
+                gap: 5px;
+            }
+            
+            .stats {
+                font-size: 14px;
+                font-weight: normal;
+                text-shadow: 1px 1px 3px rgba(0, 0, 0, 1);
+                background: rgba(0, 0, 0, 0.5);
+                border-radius: 3px;
+                padding: 4px 8px;
+                border: none;
+                line-height: 1.1;
+                backdrop-filter: blur(3px);
+            }
+            
+            .ui-panel {
+                padding: 4px 8px;
+                background: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(3px);
+                border: none;
+                border-radius: 3px;
+                font-size: 14px;
+            }
+            
+            /* FPS 顯示優化 */
+            #fpsDisplay {
+                font-size: 12px;
+                background: rgba(0, 0, 0, 0.4);
+                padding: 3px 6px;
+                border-radius: 3px;
+                border: 1px solid rgba(0, 255, 136, 0.3);
+            }
+        }
+        
+        /* 豎屏手機特別優化 */
+        @media (max-width: 768px) and (orientation: portrait) {
+            #gameContainer {
+                /* 移除CSS縮放，改用程式控制 */
+                transform: none;
+            }
+            
+            #ui {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: flex-start;
+                gap: 2px;
+                /* 移除多餘的transform縮放 */
             }
             
             .stats {
                 font-size: 12px;
+                width: auto;
+                flex: 1;
+                min-width: 120px;
+                max-width: 49%;
+                padding: 3px 6px;
+                line-height: 1.0;
+                background: rgba(0, 0, 0, 0.6);
+                border: none;
+                backdrop-filter: blur(3px);
             }
             
-            .ui-panel {
-                padding: 6px 8px;
+            .ui-panel:last-child {
+                flex: 1;
+                min-width: 120px;
+                max-width: 49%;
+                padding: 3px 6px;
+                background: rgba(0, 0, 0, 0.6);
+                border: none;
+                backdrop-filter: blur(3px);
+            }
+            
+            .stats div {
+                margin-bottom: 2px;
+            }
+            
+            /* FPS 顯示調整 */
+            #fpsDisplay {
+                font-size: 11px;
+                padding: 2px 5px;
             }
         }
         
-        @media (max-height: 600px) {
-            #ui {
-                top: 5px;
+        /* 橫屏手機特別優化 */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .stats {
+                font-size: 10px;
+                padding: 3px 6px;
+                max-width: 180px;
             }
             
             .ui-panel {
-                padding: 4px 6px;
+                padding: 3px 6px;
+                max-width: 150px;
+            }
+        }
+        
+        /* 低高度螢幕優化 */
+        @media (max-height: 600px) {
+            #ui {
+                top: 2px;
+                gap: 2px;
             }
             
             .stats {
-                font-size: 11px;
-                line-height: 1.2;
+                font-size: 9px;
+                padding: 2px 5px;
+                line-height: 1.1;
+            }
+            
+            .ui-panel {
+                padding: 2px 5px;
+                font-size: 9px;
             }
         }
         
@@ -189,8 +303,33 @@
         
         @media (max-width: 768px) {
             .touch-hint {
-                bottom: 30px;
-                font-size: 11px;
+                bottom: 80px;
+                font-size: 14px;
+                background: rgba(0, 0, 0, 0.6);
+                padding: 8px 12px;
+                border-radius: 5px;
+                border: 1px solid rgba(0, 255, 255, 0.3);
+            }
+            
+            /* 遊戲結束畫面手機優化 */
+            #gameOver {
+                width: 90vw;
+                max-width: 400px;
+                padding: 25px 20px;
+                font-size: 14px;
+            }
+            
+            #gameOver h2 {
+                font-size: 24px;
+                margin-bottom: 15px;
+            }
+            
+            .restart-button {
+                padding: 15px 25px;
+                font-size: 16px;
+                font-weight: bold;
+                width: 80%;
+                margin-top: 15px;
             }
         }
         
@@ -241,28 +380,50 @@
             <p style="font-size: 14px; color: rgba(255, 255, 255, 0.8); margin-bottom: 30px;">
                 最終得分: <span id="finalScore" style="color: #ffff00;">0</span>
             </p>
-            <button class="restart-button" onclick="location.reload()">重新部署</button>
+            <button class="restart-button" id="restartButton">重新部署</button>
         </div>
     </div>
     
     <!-- 載入遊戲模組 -->
-    <script src="js/config.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/objectPool.js"></script>
-    <script src="js/performanceStats.js"></script>
-    <script src="js/baseRenderer.js"></script>
-    <script src="js/bulletSystem.js"></script>
-    <!-- 移除未使用的環形技能選單 -->
-    <!-- <script src="js/radialSkillMenu.js"></script> -->
-    <script src="js/base.js"></script>
-    <script src="js/enemy.js"></script>
-    <script src="js/projectile.js"></script>
-    <!-- 升級系統模組 -->
-    <script src="js/experienceSystem.js"></script>
-    <script src="js/upgradeDefinitions.js"></script>
-    <script src="js/vectorIcons.js"></script>
-    <script src="js/upgradeUI.js"></script>
-    <script src="js/upgradeSystem.js"></script>
+    <!-- 模組系統和事件總線 -->
+    <script src="js/moduleLoader.js"></script>
+    <script src="js/core/eventBus.js"></script>
+    
+    <!-- 基礎設定和工具 -->
+    <script src="js/core/config.js"></script>
+    <script src="js/core/constants.js"></script>
+    <script src="js/utils/utils.js"></script>
+    <script src="js/systems/timerManager.js"></script>
+    <script src="js/systems/objectPool.js"></script>
+    <script src="js/systems/spatialGrid.js"></script>
+    <script src="js/utils/performanceStats.js"></script>
+    
+    <!-- 核心管理器 -->
+    <script src="js/core/gameStateManager.js"></script>
+    <script src="js/systems/inputManager.js"></script>
+    <script src="js/managers/renderManager.js"></script>
+    
+    <!-- 輸入系統 -->
+    <script src="js/ui/virtualJoystick.js"></script>
+    <script src="js/touchEnhancer.js"></script>
+    
+    <!-- 渲染和視覺系統 -->
+    <script src="js/rendering/baseRenderer.js"></script>
+    <script src="js/utils/vectorIcons.js"></script>
+    
+    <!-- 遊戲物件 -->
+    <script src="js/entities/bulletSystem.js"></script>
+    <script src="js/entities/base.js"></script>
+    <script src="js/entities/enemy.js"></script>
+    <script src="js/entities/projectile.js"></script>
+    
+    <!-- 升級系統 -->
+    <script src="js/systems/experienceSystem.js"></script>
+    <script src="js/ui/upgradeDefinitions.js"></script>
+    <script src="js/ui/upgradeUI.js"></script>
+    <script src="js/systems/upgradeSystem.js"></script>
+    
+    <!-- 主遊戲 -->
     <script src="js/game.js"></script>
 </body>
 </html>

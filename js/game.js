@@ -6,6 +6,10 @@ class CyberpunkCatDefense {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         
+        // 事件處理器引用（用於清理）
+        this.eventHandlers = {};
+        this.animationFrameId = null;
+        
         // 響應式設計初始化
         this.initResponsiveCanvas();
         
@@ -30,13 +34,29 @@ class CyberpunkCatDefense {
         this.projectileManager = new ProjectileManager(this);
         this.particleManager = new ParticleManager();
         this.performanceMonitor = new PerformanceMonitor();
+        this.virtualJoystick = new VirtualJoystick(this.canvas);
+        this.touchEnhancer = new TouchEnhancer(this);  // 觸控增強系統
+        
+        // 創建空間網格系統（優化碰撞檢測）
+        this.spatialGrid = new SpatialGrid(GameConfig.CANVAS.WIDTH, GameConfig.CANVAS.HEIGHT, GameConstants.SPATIAL_GRID.CELL_SIZE);
         // 移除未使用的環形技能選單
         // this.radialSkillMenu = new RadialSkillMenu(this);
         this.upgradeSystem = new UpgradeSystem(this);
         
+        // 事件總線監聽器參考
+        this.eventListeners = [];
+        
         // 快捷引用
         this.enemies = this.enemyManager.enemies;
         this.particles = this.particleManager.particles;
+        
+        // 總計數據
+        this.stats = {
+            totalEnemiesKilled: 0,
+            totalDamageDealt: 0,
+            totalGoldEarned: 0,
+            totalWavesCompleted: 0
+        };
         
         // 背景數據流粒子
         this.backgroundParticles = [];
@@ -51,65 +71,264 @@ class CyberpunkCatDefense {
     
     // 響應式畫布設定
     initResponsiveCanvas() {
-        const resize = () => {
-            const maxWidth = window.innerWidth - 20;
-            const maxHeight = window.innerHeight - 20;
+        this.eventHandlers.resize = () => {
+            const isMobile = window.innerWidth <= 768;
+            const isPortrait = window.innerHeight > window.innerWidth;
             
-            let scale = Math.min(maxWidth / GameConfig.CANVAS.WIDTH, maxHeight / GameConfig.CANVAS.HEIGHT);
+            // 記錄螢幕狀態
+            this.isPortraitMode = isPortrait && isMobile;
             
-            if (window.innerWidth <= 768) {
-                // 手機模式：優化比例
-                this.canvas.style.width = maxWidth + 'px';
-                this.canvas.style.height = (maxWidth * 0.75) + 'px';
+            // 設定手機渲染縮放係數（再次調小到合適大小）
+            this.mobileRenderScale = (this.isPortraitMode) ? 1.1 : 1.0;
+            
+            // 重置繪圖上下文的變換矩陣
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+            
+            if (isMobile) {
+                // 手機模式：充滿整個螢幕
+                this.canvas.style.width = '100vw';
+                this.canvas.style.height = '100vh';
+                this.canvas.style.position = 'fixed';
+                this.canvas.style.top = '0';
+                this.canvas.style.left = '0';
+                this.canvas.style.zIndex = '1';
+                
+                // 始終使用標準畫布尺寸，避免破壞遊戲邏輯
+                this.canvas.width = GameConfig.CANVAS.WIDTH;
+                this.canvas.height = GameConfig.CANVAS.HEIGHT;
+                
+                // 計算縮放比例
+                this.mobileScale = Math.min(
+                    window.innerWidth / GameConfig.CANVAS.WIDTH,
+                    window.innerHeight / GameConfig.CANVAS.HEIGHT
+                );
+                
+                // 計算居中偏移
+                this.mobileOffsetX = (window.innerWidth - GameConfig.CANVAS.WIDTH * this.mobileScale) / 2;
+                this.mobileOffsetY = (window.innerHeight - GameConfig.CANVAS.HEIGHT * this.mobileScale) / 2;
+                
             } else {
-                // 桌面模式：保持原比例
+                // 桌面模式：保持清晰度
+                const maxWidth = window.innerWidth - (GameConstants.RESPONSIVE?.WINDOW_PADDING || 40);
+                const maxHeight = window.innerHeight - (GameConstants.RESPONSIVE?.WINDOW_PADDING || 40);
+                
+                let scale = Math.min(maxWidth / GameConfig.CANVAS.WIDTH, maxHeight / GameConfig.CANVAS.HEIGHT);
+                
+                // 設置CSS顯示尺寸
                 this.canvas.style.width = (GameConfig.CANVAS.WIDTH * scale) + 'px';
                 this.canvas.style.height = (GameConfig.CANVAS.HEIGHT * scale) + 'px';
+                this.canvas.style.position = 'relative';
+                this.canvas.style.zIndex = 'auto';
+                
+                // 考慮設備像素比以保持清晰度
+                const pixelRatio = window.devicePixelRatio || 1;
+                this.canvas.width = GameConfig.CANVAS.WIDTH * pixelRatio;
+                this.canvas.height = GameConfig.CANVAS.HEIGHT * pixelRatio;
+                
+                // 縮放繪圖上下文以匹配設備像素比
+                this.ctx.scale(pixelRatio, pixelRatio);
+                
+                this.mobileScale = 1;
+                this.mobileOffsetX = 0;
+                this.mobileOffsetY = 0;
+                this.isPortraitMode = false;
             }
         };
         
-        window.addEventListener('resize', resize);
-        resize();
+        window.addEventListener('resize', this.eventHandlers.resize);
+        this.eventHandlers.resize();
     }
     
     // 初始化遊戲
     init() {
+        // 設定全域引用供其他模組使用
+        window.currentGame = this;
+        
+        this.setupEventListeners();
         this.bindEvents();
         this.startGameLoop();
         console.log('🐱 賽博龐克貓咪塔防啟動！');
+        
+        // 發送遊戲開始事件
+        if (window.gameEventBus) {
+            window.gameEventBus.emit(GameEvents.GAME_START, {
+                timestamp: Date.now(),
+                config: GameConfig
+            });
+        }
+    }
+    
+    // 設置事件總線監聽器
+    setupEventListeners() {
+        if (!window.gameEventBus) return;
+        
+        // 敵人死亡事件
+        this.eventListeners.push(
+            window.gameEventBus.on(GameEvents.ENEMY_DEATH, (data) => {
+                this.stats.totalEnemiesKilled++;
+                this.stats.totalGoldEarned += data.reward;
+            })
+        );
+        
+        // 基地受傷事件
+        this.eventListeners.push(
+            window.gameEventBus.on(GameEvents.BASE_DAMAGE, (data) => {
+                // 可以在這裡添加音效或其他效果
+                console.log(`基地受到 ${data.damage} 點傷害`);
+            })
+        );
+        
+        // 升級購買事件
+        this.eventListeners.push(
+            window.gameEventBus.on(GameEvents.UPGRADE_PURCHASE, (data) => {
+                console.log(`購買升級: ${data.name}`);
+            })
+        );
+        
+        // 分數更新事件
+        this.eventListeners.push(
+            window.gameEventBus.on(GameEvents.SCORE_UPDATE, (data) => {
+                // 可以觸發 UI 動畫等
+            })
+        );
+    }
+    
+    // 清理所有資源
+    cleanup() {
+        console.log('🧹 開始清理遊戲資源...');
+        
+        // 停止動畫循環
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+        
+        // 清理所有事件監聽器
+        this.removeAllEventListeners();
+        
+        // 清理事件總線監聽器
+        if (this.eventListeners && window.gameEventBus) {
+            this.eventListeners.forEach(unsubscribe => {
+                if (typeof unsubscribe === 'function') {
+                    unsubscribe();
+                }
+            });
+            this.eventListeners = [];
+        }
+        
+        // 清理計時器
+        if (window.timerManager) {
+            window.timerManager.clearAll();
+        }
+        
+        // 清理子系統
+        if (this.upgradeSystem && this.upgradeSystem.cleanup) {
+            this.upgradeSystem.cleanup();
+        }
+        if (this.virtualJoystick && this.virtualJoystick.cleanup) {
+            this.virtualJoystick.cleanup();
+        }
+        if (this.touchEnhancer && this.touchEnhancer.cleanup) {
+            this.touchEnhancer.cleanup();
+        }
+        
+        // 清理物件池
+        if (window.objectPoolManager) {
+            window.objectPoolManager.clear();
+        }
+        
+        // 清理性能統計
+        if (window.performanceStats && window.performanceStats.cleanup) {
+            window.performanceStats.cleanup();
+        }
+        
+        console.log('✅ 遊戲資源清理完成');
+    }
+    
+    // 移除所有事件監聽器
+    removeAllEventListeners() {
+        // 移除視窗事件
+        if (this.eventHandlers.resize) {
+            window.removeEventListener('resize', this.eventHandlers.resize);
+        }
+        if (this.eventHandlers.blur) {
+            window.removeEventListener('blur', this.eventHandlers.blur);
+        }
+        if (this.eventHandlers.focus) {
+            window.removeEventListener('focus', this.eventHandlers.focus);
+        }
+        
+        // 移除文檔事件
+        if (this.eventHandlers.touchmoveDoc) {
+            document.removeEventListener('touchmove', this.eventHandlers.touchmoveDoc);
+        }
+        if (this.eventHandlers.touchstartDoc) {
+            document.removeEventListener('touchstart', this.eventHandlers.touchstartDoc);
+        }
+        if (this.eventHandlers.visibilitychange) {
+            document.removeEventListener('visibilitychange', this.eventHandlers.visibilitychange);
+        }
+        
+        // 移除畫布事件
+        if (this.eventHandlers.touchstart) {
+            this.canvas.removeEventListener('touchstart', this.eventHandlers.touchstart);
+        }
+        if (this.eventHandlers.click) {
+            this.canvas.removeEventListener('click', this.eventHandlers.click);
+        }
+        if (this.eventHandlers.mousemove) {
+            this.canvas.removeEventListener('mousemove', this.eventHandlers.mousemove);
+        }
+        if (this.eventHandlers.touchmove) {
+            this.canvas.removeEventListener('touchmove', this.eventHandlers.touchmove);
+        }
+        if (this.eventHandlers.mouseleave) {
+            this.canvas.removeEventListener('mouseleave', this.eventHandlers.mouseleave);
+        }
+        if (this.eventHandlers.keydown) {
+            document.removeEventListener('keydown', this.eventHandlers.keydown);
+        }
+        
+        // 清空事件處理器引用
+        this.eventHandlers = {};
     }
     
     // 綁定事件 - 只支援觸控
     bindEvents() {
         // 防止頁面滾動和縮放
-        document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-        document.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+        this.eventHandlers.touchmoveDoc = (e) => e.preventDefault();
+        this.eventHandlers.touchstartDoc = (e) => e.preventDefault();
+        document.addEventListener('touchmove', this.eventHandlers.touchmoveDoc, { passive: false });
+        document.addEventListener('touchstart', this.eventHandlers.touchstartDoc, { passive: false });
         
         // 觸控事件
-        this.canvas.addEventListener('touchstart', (e) => {
+        this.eventHandlers.touchstart = (e) => {
             e.preventDefault();
             const touch = e.touches[0];
             this.handleTouch({
                 clientX: touch.clientX,
                 clientY: touch.clientY
             });
-        }, { passive: false });
+        };
+        this.canvas.addEventListener('touchstart', this.eventHandlers.touchstart, { passive: false });
         
         // 桌面點擊支援
-        this.canvas.addEventListener('click', (e) => {
+        this.eventHandlers.click = (e) => {
             this.handleTouch(e);
-        });
+        };
+        this.canvas.addEventListener('click', this.eventHandlers.click);
         
         // 綁定技能按鈕
         this.bindSkillButtons();
         
         // 滑鼠移動追蹤
-        this.canvas.addEventListener('mousemove', (e) => {
+        this.eventHandlers.mousemove = (e) => {
             this.handleMouseMove(e);
-        });
+        };
+        this.canvas.addEventListener('mousemove', this.eventHandlers.mousemove);
         
         // 觸控移動追蹤
-        this.canvas.addEventListener('touchmove', (e) => {
+        this.eventHandlers.touchmove = (e) => {
             e.preventDefault();
             if (e.touches.length > 0) {
                 const touch = e.touches[0];
@@ -118,31 +337,46 @@ class CyberpunkCatDefense {
                     clientY: touch.clientY
                 });
             }
-        }, { passive: false });
+        };
+        this.canvas.addEventListener('touchmove', this.eventHandlers.touchmove, { passive: false });
         
         // 滑鼠離開畫布
-        this.canvas.addEventListener('mouseleave', () => {
+        this.eventHandlers.mouseleave = () => {
             this.gameState.mouseX = null;
             this.gameState.mouseY = null;
-        });
+        };
+        this.canvas.addEventListener('mouseleave', this.eventHandlers.mouseleave);
         
         // 窗口焦點管理
-        window.addEventListener('blur', () => this.pauseGame());
-        window.addEventListener('focus', () => this.resumeGame());
+        this.eventHandlers.blur = () => this.pauseGame();
+        this.eventHandlers.focus = () => this.resumeGame();
+        window.addEventListener('blur', this.eventHandlers.blur);
+        window.addEventListener('focus', this.eventHandlers.focus);
         
         // 視窗可見性變化
-        document.addEventListener('visibilitychange', () => {
+        this.eventHandlers.visibilitychange = () => {
             if (document.hidden) {
                 this.pauseGame();
             } else {
                 this.resumeGame();
             }
-        });
+        };
+        document.addEventListener('visibilitychange', this.eventHandlers.visibilitychange);
+        
+        // 鍵盤事件（調試功能）
+        this.eventHandlers.keydown = (e) => {
+            // G 鍵：切換空間網格調試顯示
+            if (e.key === 'g' || e.key === 'G') {
+                this.debugSpatialGrid = !this.debugSpatialGrid;
+                console.log(`空間網格調試: ${this.debugSpatialGrid ? '開啟' : '關閉'}`);
+            }
+        };
+        document.addEventListener('keydown', this.eventHandlers.keydown);
     }
     
     // 初始化背景數據流粒子
     initBackgroundParticles() {
-        const particleCount = 25;
+        const particleCount = GameConstants.RENDERING.BACKGROUND_PARTICLE_COUNT;
         for (let i = 0; i < particleCount; i++) {
             this.backgroundParticles.push({
                 x: Math.random() * this.canvas.width,
@@ -277,6 +511,12 @@ class CyberpunkCatDefense {
         const x = (event.clientX - rect.left) * scaleX;
         const y = (event.clientY - rect.top) * scaleY;
         
+        
+        // 使用觸控增強系統處理
+        if (this.touchEnhancer) {
+            this.touchEnhancer.handleEnhancedTouch(x, y, 'end');
+        }
+        
         // 創建觸控特效
         this.particleManager.createTouchEffect(x, y);
         
@@ -284,9 +524,6 @@ class CyberpunkCatDefense {
         if (this.base && this.base.bulletSystem) {
             this.base.bulletSystem.fireSpecialAttack(x, y);
         }
-        
-        // 可以在這裡添加其他觸控互動
-        // console.log(`觸控位置: ${Math.round(x)}, ${Math.round(y)}`); // 移除頻繁日誌
     }
     
     // 處理滑鼠移動
@@ -297,6 +534,28 @@ class CyberpunkCatDefense {
         
         this.gameState.mouseX = (event.clientX - rect.left) * scaleX;
         this.gameState.mouseY = (event.clientY - rect.top) * scaleY;
+    }
+    
+    // 處理虛擬搖桿輸入
+    handleVirtualJoystickInput() {
+        if (!this.virtualJoystick.isInUse()) return;
+        
+        const input = this.virtualJoystick.getInput();
+        if (input.magnitude > 0) {
+            // 將搖桿輸入轉換為螢幕座標
+            // 以基地為中心，搖桿控制攻擊方向
+            const range = 200; // 攻擊範圍
+            const targetX = this.base.x + input.x * range;
+            const targetY = this.base.y + input.y * range;
+            
+            // 限制在畫布範圍內
+            const clampedX = Math.max(0, Math.min(GameConfig.CANVAS.WIDTH, targetX));
+            const clampedY = Math.max(0, Math.min(GameConfig.CANVAS.HEIGHT, targetY));
+            
+            // 更新滑鼠座標，讓彈幕系統使用
+            this.gameState.mouseX = clampedX;
+            this.gameState.mouseY = clampedY;
+        }
     }
     
     // 綁定技能按鈕
@@ -344,12 +603,12 @@ class CyberpunkCatDefense {
                     window.performanceStats.endFrame();
                 }
                 
-                requestAnimationFrame(gameLoop);
+                this.animationFrameId = requestAnimationFrame(gameLoop);
             }
         };
         
         this.lastFrameTime = performance.now();
-        requestAnimationFrame(gameLoop);
+        this.animationFrameId = requestAnimationFrame(gameLoop);
     }
     
     // 主更新循環
@@ -392,11 +651,30 @@ class CyberpunkCatDefense {
         // 更新敵人管理器
         this.enemyManager.update(deltaTime);
         
+        // 更新空間網格（用於優化碰撞檢測）
+        this.spatialGrid.clear();
+        for (const enemy of this.enemyManager.enemies) {
+            if (enemy.active) {
+                this.spatialGrid.insert(enemy, enemy.x, enemy.y);
+            }
+        }
+        
         // 更新投射物
         this.projectileManager.update(deltaTime);
         
         // 更新粒子
         this.particleManager.update(deltaTime);
+        
+        // 更新虛擬搖桿
+        this.virtualJoystick.update(deltaTime);
+        
+        // 處理虛擬搖桿輸入
+        this.handleVirtualJoystickInput();
+        
+        // 更新觸控增強系統
+        if (this.touchEnhancer) {
+            this.touchEnhancer.update(deltaTime);
+        }
         
         // 更新環形選單
         // 移除環形技能選單更新
@@ -428,9 +706,9 @@ class CyberpunkCatDefense {
             this.ctx.translate(this.shakeOffsetX || 0, this.shakeOffsetY || 0);
         }
         
-        // 清空畫布
+        // 清空畫布（使用實際畫布尺寸）
         this.ctx.fillStyle = '#000000';
-        this.ctx.fillRect(-50, -50, GameConfig.CANVAS.WIDTH + 100, GameConfig.CANVAS.HEIGHT + 100);
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         // 渲染背景數據流（最底層）
         this.renderBackgroundParticles(this.ctx);
@@ -456,6 +734,16 @@ class CyberpunkCatDefense {
         
         // 渲染升級系統UI
         this.upgradeSystem.render(this.ctx);
+        
+        // 渲染觸控增強效果
+        if (this.touchEnhancer) {
+            this.touchEnhancer.render(this.ctx);
+        }
+        
+        // 調試模式：渲染空間網格（按 G 鍵切換）
+        if (this.debugSpatialGrid) {
+            this.spatialGrid.debugRender(this.ctx);
+        }
         
         // 恢復畫布狀態（在所有渲染完成後）
         this.ctx.restore();
@@ -1056,6 +1344,17 @@ class CyberpunkCatDefense {
     gameOver() {
         this.gameState.isGameOver = true;
         
+        // 發送遊戲結束事件
+        if (window.gameEventBus) {
+            window.gameEventBus.emit(GameEvents.GAME_OVER, {
+                finalWave: this.gameState.wave - 1,
+                finalScore: this.gameState.score,
+                totalKills: this.stats.totalEnemiesKilled,
+                totalGoldEarned: this.stats.totalGoldEarned,
+                playTime: Math.floor((Date.now() - this.gameState.startTime) / 1000)
+            });
+        }
+        
         // 顯示遊戲結束畫面
         const gameOverDiv = document.getElementById('gameOver');
         const finalWaveSpan = document.getElementById('finalWave');
@@ -1064,6 +1363,24 @@ class CyberpunkCatDefense {
         if (gameOverDiv) gameOverDiv.style.display = 'block';
         if (finalWaveSpan) finalWaveSpan.textContent = this.gameState.wave - 1;
         if (finalScoreSpan) finalScoreSpan.textContent = this.gameState.score.toLocaleString();
+        
+        // 綁定重新開始按鈕的點擊和觸控事件
+        const restartButton = document.getElementById('restartButton');
+        if (restartButton) {
+            // 移除舊的事件監聽器（如果有的話）
+            restartButton.onclick = null;
+            restartButton.ontouchstart = null;
+            
+            // 使用統一的處理函數，避免重複觸發
+            const handleRestart = (e) => {
+                e.preventDefault();
+                location.reload();
+            };
+            
+            // 同時支援點擊和觸控
+            restartButton.addEventListener('click', handleRestart);
+            restartButton.addEventListener('touchstart', handleRestart);
+        }
         
         console.log(`🎯 遊戲結束！堅持了 ${this.gameState.wave - 1} 波，最終得分：${this.gameState.score}`);
     }
@@ -1105,7 +1422,11 @@ class CyberpunkCatDefense {
         this.enemyManager = new EnemyManager(this);
         this.projectileManager = new ProjectileManager(this);
         this.particleManager = new ParticleManager();
+        this.virtualJoystick.reset();
         this.upgradeSystem.reset();
+        
+        // 重建空間網格
+        this.spatialGrid = new SpatialGrid(GameConfig.CANVAS.WIDTH, GameConfig.CANVAS.HEIGHT, 80);
         
         // 更新引用
         this.enemies = this.enemyManager.enemies;
@@ -1143,7 +1464,7 @@ class CyberpunkCatDefense {
 let game;
 
 // DOM 載入完成後啟動
-window.addEventListener('DOMContentLoaded', () => {
+const domContentLoadedHandler = () => {
     try {
         game = new CyberpunkCatDefense('gameCanvas');
         window.game = game; // 全域訪問
@@ -1180,6 +1501,15 @@ window.addEventListener('DOMContentLoaded', () => {
             </button>
         `;
         document.body.appendChild(errorDiv);
+    }
+};
+
+window.addEventListener('DOMContentLoaded', domContentLoadedHandler);
+
+// 頁面卸載時清理
+window.addEventListener('beforeunload', () => {
+    if (game && game.cleanup) {
+        game.cleanup();
     }
 });
 

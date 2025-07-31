@@ -2,25 +2,37 @@
 // 只保留基本的敵人類型和移動邏輯
 
 class Enemy {
-    constructor(x, y, type) {
+    constructor(x = -100, y = -100, type = 'normal') {
         this.x = x;
         this.y = y;
         this.type = type;
         
-        const config = GameConfig.ENEMIES[type];
-        this.speed = config.speed;
-        this.health = config.health;
-        this.maxHealth = config.health;
-        this.color = config.color;
-        this.size = config.size;
-        this.reward = config.reward;
-        this.damage = config.damage;
+        // 只有在有有效類型時才初始化屬性
+        if (GameConfig.ENEMIES && GameConfig.ENEMIES[type]) {
+            const config = GameConfig.ENEMIES[type];
+            this.speed = config.speed;
+            this.health = config.health;
+            this.maxHealth = config.health;
+            this.color = config.color;
+            this.size = config.size;
+            this.reward = config.reward;
+            this.damage = config.damage;
+        } else {
+            // 默認值（對象池初始化時使用）
+            this.speed = 0;
+            this.health = 0;
+            this.maxHealth = 0;
+            this.color = '#ff0000';
+            this.size = 10;
+            this.reward = 10;
+            this.damage = 1;
+        }
         
-        // 目標：貓咪基地
+        // 目標：貓咪基地（初始值，會在 reset 中更新）
         this.targetX = GameConfig.GAME.BASE_X;
         this.targetY = GameConfig.GAME.BASE_Y;
         
-        this.active = true;
+        this.active = false; // 默認非活躍（對象池）
         this.glowIntensity = 0;
         
         // 視覺效果
@@ -66,11 +78,56 @@ class Enemy {
         this.health -= Math.round(damage);
         this.glowIntensity = 1.0;
         
+        // 發送敵人受傷事件
+        if (window.gameEventBus && this.health > 0) {
+            window.gameEventBus.emit(GameEvents.ENEMY_DAMAGE, {
+                enemy: this,
+                damage: damage,
+                remainingHealth: this.health,
+                healthPercent: this.health / this.maxHealth
+            });
+        }
+        
         if (this.health <= 0) {
-            this.active = false;
+            // 敵人被擊殺
+            // 不要在這裡設置 active = false，讓 update 循環處理
             return true; // 死亡
         }
         return false;
+    }
+    
+    // 重置敵人狀態（用於對象池重用）
+    reset(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        
+        // 重置類型相關屬性
+        const config = GameConfig.ENEMIES[type];
+        this.health = config.health;
+        this.maxHealth = config.health;
+        this.speed = config.speed;
+        this.damage = config.damage;
+        this.reward = config.reward;
+        this.color = config.color;
+        this.size = config.size;
+        
+        // 重置狀態
+        this.active = true;
+        this.glowIntensity = 0;
+        this.pulsePhase = 0;
+        
+        // 清除任何特殊效果標記
+        if (this.slowedByRift) {
+            this.speed = this.originalSpeed || this.speed;
+            this.slowedByRift = false;
+        }
+        
+        // 特殊類型的額外重置
+        if (type === 'tank') {
+            this.shieldActive = true;
+            this.shieldHits = 0;
+        }
     }
 
     render(ctx) {
@@ -89,7 +146,11 @@ class Enemy {
 
         // 脈衝效果
         const pulse = 1 + Math.sin(this.pulsePhase) * 0.1;
-        const currentSize = this.size * pulse;
+        
+        // 獲取手機渲染縮放係數（從全域變數或透過 window 獲取）
+        const game = window.currentGame || (this.manager && this.manager.game);
+        const renderScale = game?.mobileRenderScale || 1.0;
+        const currentSize = this.size * pulse * renderScale;
 
         // 繪製敵人主體 - 賽博龐克風格
         this.drawCyberpunkEnemy(ctx, currentSize);
@@ -480,17 +541,92 @@ class EnemyManager {
     constructor(game) {
         this.game = game;
         this.enemies = [];
+        this.enemyPool = []; // 對象池
+        this.maxPoolSize = 50; // 最大池大小
         this.spawnTimer = 0;
         this.waveActive = false;
         this.currentWave = 1;
         this.enemiesSpawned = 0;
         this.maxEnemiesInWave = 5;
+        this.activeEnemyCount = 0; // 追蹤活躍敵人數量
+        
+        // 預先創建一些敵人對象
+        this.initializePool();
+    }
+    
+    // 初始化對象池
+    initializePool() {
+        for (let i = 0; i < 10; i++) {
+            const enemy = new Enemy();
+            enemy.active = false;
+            this.enemyPool.push(enemy);
+        }
+    }
+    
+    // 從對象池獲取敵人
+    getEnemyFromPool() {
+        // 先嘗試從池中找到非活躍的敵人
+        for (let enemy of this.enemyPool) {
+            if (!enemy.active) {
+                return enemy;
+            }
+        }
+        
+        // 如果池中沒有可用的，且池大小未達上限，創建新的
+        if (this.enemyPool.length < this.maxPoolSize) {
+            const enemy = new Enemy();
+            this.enemyPool.push(enemy);
+            return enemy;
+        }
+        
+        // 如果池已滿，創建臨時敵人（不加入池）
+        return new Enemy();
+    }
+    
+    // 回收敵人到對象池
+    recycleEnemy(enemy) {
+        enemy.active = false;
+        enemy.x = -100; // 移到螢幕外
+        enemy.y = -100;
+        // 重置其他必要的屬性
+        if (enemy.slowedByRift) {
+            enemy.speed = enemy.originalSpeed;
+            enemy.slowedByRift = false;
+        }
     }
 
     update(deltaTime) {
+        // 使用單次遍歷處理所有邏輯
+        this.activeEnemyCount = 0;
+        const deadEnemies = [];
+        
         // 更新現有敵人
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const enemy = this.enemies[i];
+            
+            // 先檢查是否被擊殺（health <= 0）- 不管 active 狀態
+            if (enemy.health <= 0) {
+                // 敵人被擊殺
+                enemy.active = false;
+                deadEnemies.push({ enemy, index: i, reason: 'killed' });
+                
+                // 發送敵人死亡事件
+                if (window.gameEventBus) {
+                    window.gameEventBus.emit(GameEvents.ENEMY_DEATH, {
+                        enemy: enemy,
+                        position: { x: enemy.x, y: enemy.y },
+                        type: enemy.type,
+                        reward: enemy.reward
+                    });
+                }
+                continue;
+            }
+            
+            // 跳過已經非活躍的敵人
+            if (!enemy.active) {
+                continue;
+            }
+            
             const reachedBase = enemy.update(deltaTime);
 
             if (reachedBase) {
@@ -498,12 +634,30 @@ class EnemyManager {
                 this.game.base.takeDamage(enemy.damage);
                 this.game.gameState.lives -= enemy.damage;
                 this.game.gameState.streak = 0;  // 重置連殺
-                this.enemies.splice(i, 1);
-                continue;
+                deadEnemies.push({ enemy, index: i, reason: 'reached_base' });
+                
+                // 發送敵人到達基地事件
+                if (window.gameEventBus) {
+                    window.gameEventBus.emit(GameEvents.ENEMY_REACH_BASE, {
+                        enemy: enemy,
+                        damage: enemy.damage,
+                        remainingLives: this.game.gameState.lives
+                    });
+                }
+            } else {
+                // 敵人仍然活著
+                this.activeEnemyCount++;
             }
-
-            if (!enemy.active) {
-                // 敵人死亡
+        }
+        
+        // 處理死亡的敵人（反向處理以確保索引正確）
+        for (let i = deadEnemies.length - 1; i >= 0; i--) {
+            const { enemy, index, reason } = deadEnemies[i];
+            
+            // 處理敵人死亡
+            
+            if (reason === 'killed') {
+                // 處理擊殺獎勵
                 this.game.gameState.score += enemy.reward;
                 this.game.gameState.gold += enemy.reward;
                 this.game.gameState.kills++;
@@ -516,15 +670,17 @@ class EnemyManager {
                 }
                 
                 // 升級系統：獲得經驗值
-                if (this.game.upgradeSystem) {
+                if (this.game && this.game.upgradeSystem) {
                     this.game.upgradeSystem.onEnemyKilled(enemy.type);
                     this.game.upgradeSystem.onEnemyKilledByPlayer(enemy);
                 }
                 
                 this.game.createDeathEffect(enemy.x, enemy.y, enemy.color);
-                this.enemies.splice(i, 1);
-                continue;
             }
+            
+            // 從陣列中移除並回收
+            this.enemies.splice(index, 1);
+            this.recycleEnemy(enemy);
         }
 
         // 波次管理
@@ -533,8 +689,8 @@ class EnemyManager {
 
     updateWaveLogic(deltaTime) {
         if (!this.waveActive) {
-            // 檢查是否開始新波次
-            if (this.enemies.length === 0) {
+            // 檢查是否開始新波次（使用活躍敵人數量）
+            if (this.activeEnemyCount === 0) {
                 this.startNextWave();
             }
             return;
@@ -550,7 +706,7 @@ class EnemyManager {
         }
 
         // 檢查波次是否完成
-        if (this.enemiesSpawned >= this.maxEnemiesInWave && this.enemies.length === 0) {
+        if (this.enemiesSpawned >= this.maxEnemiesInWave && this.activeEnemyCount === 0) {
             this.completeWave();
         }
     }
@@ -624,14 +780,21 @@ class EnemyManager {
                 break;
         }
 
-        const enemy = new Enemy(x, y, randomType);
+        // 從對象池獲取敵人
+        const enemy = this.getEnemyFromPool();
+        
+        // 重置敵人屬性
+        enemy.reset(x, y, randomType);
         
         // 應用波次修正
         enemy.health *= waveInfo.healthMultiplier;
         enemy.maxHealth = enemy.health;
         enemy.speed *= waveInfo.speedMultiplier;
 
-        this.enemies.push(enemy);
+        // 只有當敵人不在陣列中時才添加
+        if (!this.enemies.includes(enemy)) {
+            this.enemies.push(enemy);
+        }
         this.enemiesSpawned++;
     }
     
@@ -640,7 +803,9 @@ class EnemyManager {
         const x = GameConfig.CANVAS.WIDTH / 2;
         const y = -50;
         
-        const boss = new Enemy(x, y, 'boss');
+        // 從對象池獲取敵人
+        const boss = this.getEnemyFromPool();
+        boss.reset(x, y, 'boss');
         
         // 應用波次修正
         boss.health *= waveInfo.healthMultiplier;
@@ -650,7 +815,10 @@ class EnemyManager {
         // BOSS 震撼入場特效
         this.createBossEntryEffect(x, y);
         
-        this.enemies.push(boss);
+        // 只有當敵人不在陣列中時才添加
+        if (!this.enemies.includes(boss)) {
+            this.enemies.push(boss);
+        }
         
         console.log(`BOSS 出現！血量：${boss.health}`);
     }
@@ -695,21 +863,40 @@ class EnemyManager {
         
         // 多重衝擊波
         for (let i = 0; i < 3; i++) {
-            setTimeout(() => {
-                this.game.specialEffects.push({
-                    type: 'shockwave',
-                    x: x,
-                    y: y + i * 50,  // 逐漸下移
-                    radius: 0,
-                    maxRadius: 300 + i * 100,
-                    expandSpeed: 500 - i * 50,
-                    alpha: 0.8 - i * 0.2,
-                    color: '#ff00ff',
-                    lineWidth: 5 - i,
-                    createdTime: Date.now(),
-                    duration: 1.0
-                });
-            }, i * 200);
+            const delay = i * 200;
+            if (window.timerManager) {
+                window.timerManager.setTimeout(() => {
+                    this.game.specialEffects.push({
+                        type: 'shockwave',
+                        x: x,
+                        y: y + i * 50,  // 逐漸下移
+                        radius: 0,
+                        maxRadius: 300 + i * 100,
+                        expandSpeed: 500 - i * 50,
+                        alpha: 0.8 - i * 0.2,
+                        color: '#ff00ff',
+                        lineWidth: 5 - i,
+                        createdTime: Date.now(),
+                        duration: 1.0
+                    });
+                }, delay);
+            } else {
+                setTimeout(() => {
+                    this.game.specialEffects.push({
+                        type: 'shockwave',
+                        x: x,
+                        y: y + i * 50,  // 逐漸下移
+                        radius: 0,
+                        maxRadius: 300 + i * 100,
+                        expandSpeed: 500 - i * 50,
+                        alpha: 0.8 - i * 0.2,
+                        color: '#ff00ff',
+                        lineWidth: 5 - i,
+                        createdTime: Date.now(),
+                        duration: 1.0
+                    });
+                }, delay);
+            }
         }
         
         // 4. 警告閃爍效果

@@ -35,8 +35,16 @@ class UpgradeSystem {
         // 狀態追蹤
         this.pendingUpgrade = false;
         this.upgradeCallback = null;
+        this.availableUpgrades = []; // 追加可用升級選項
         
         console.log('升級系統初始化完成');
+    }
+    
+    // 清理升級系統
+    cleanup() {
+        if (this.upgradeUI && this.upgradeUI.cleanup) {
+            this.upgradeUI.cleanup();
+        }
     }
     
     // 波次完成觸發升級選擇
@@ -81,12 +89,16 @@ class UpgradeSystem {
             return;
         }
         
+        // 設定可用升級選項
+        this.availableUpgrades = upgradeChoices;
+        
         // 顯示升級UI
         console.log('📋 顯示升級UI');
         this.upgradeUI.show(upgradeChoices, (selectedUpgrade) => {
             console.log(`✅ 選擇了升級: ${selectedUpgrade.name}`);
             this.applyUpgrade(selectedUpgrade);
             this.pendingUpgrade = false;
+            this.availableUpgrades = []; // 清空選項
             
             // 繼續遊戲
             if (this.upgradeCallback) {
@@ -103,12 +115,24 @@ class UpgradeSystem {
     
     // 敵人死亡獲得經驗值
     onEnemyKilled(enemyType) {
-        this.experienceSystem.killEnemy(enemyType);
+        if (this.experienceSystem) {
+            this.experienceSystem.killEnemy(enemyType);
+        }
     }
     
     // 應用選中的升級
     applyUpgrade(upgrade) {
         console.log(`應用升級: ${upgrade.name}`);
+        
+        // 發送升級購買事件
+        if (window.gameEventBus) {
+            window.gameEventBus.emit(GameEvents.UPGRADE_PURCHASE, {
+                upgrade: upgrade,
+                category: upgrade.category,
+                name: upgrade.name,
+                level: upgrade.level || 1
+            });
+        }
         
         switch (upgrade.category) {
             case 'weapon':
@@ -147,6 +171,14 @@ class UpgradeSystem {
                 const levelData = upgrade.levelEffects[newLevel - 1];
                 this.playerUpgrades.weapons[existingIndex].currentEffect = levelData.newWeapon;
                 console.log(`${upgrade.name} 升級到等級 ${newLevel}: ${levelData.description}`);
+            }
+            
+            // 發送最高等級事件
+            if (newLevel === maxLevel && window.gameEventBus) {
+                window.gameEventBus.emit(GameEvents.UPGRADE_MAX_LEVEL, {
+                    upgrade: upgrade,
+                    finalLevel: newLevel
+                });
             }
         } else {
             // 添加新武器
@@ -1020,17 +1052,15 @@ class UpgradeSystem {
         this.updateSpecialWeapons(deltaTime);
     }
     
-    // 渲染系統（將經驗條和能量條移到畫面底部中央）
+    // 渲染系統
     render(ctx) {
-        // 計算底部中央位置
-        const centerX = ctx.canvas.width / 2 - 90; // 條寬度180的一半
-        const bottomY = ctx.canvas.height - 80; // 離底部80像素
-        
-        // 渲染經驗值UI（底部中央）
-        this.experienceSystem.render(ctx, centerX, bottomY);
-        
-        // 渲染升級UI
+        // 渲染升級UI（如果可見）
         this.upgradeUI.render(ctx);
+        
+        // 如果升級UI不可見，渲染經驗條
+        if (!this.upgradeUI.visible) {
+            this.experienceSystem.render(ctx);
+        }
     }
     
     // 重置系統
@@ -1045,6 +1075,7 @@ class UpgradeSystem {
         this.specialWeapons = [];
         this.weaponCooldowns = {};
         this.pendingUpgrade = false;
+        this.availableUpgrades = [];
         this.recalculateEffects();
         
         console.log('升級系統已重置');
