@@ -25,6 +25,13 @@ class UpgradeUI {
         this.backgroundParticles = [];
         this.initBackgroundParticles();
         
+        // 滑動相關狀態
+        this.currentCardIndex = 0;  // 當前顯示的卡片索引
+        this.swipeOffset = 0;       // 滑動偏移量
+        this.isDragging = false;    // 是否正在拖拽
+        this.dragStartX = 0;        // 拖拽起始X座標
+        this.dragStartTime = 0;     // 拖拽起始時間
+        
         // 綁定事件
         this.bindEvents();
     }
@@ -43,15 +50,16 @@ class UpgradeUI {
         console.log(`🔍 平台檢測: 觸控設備=${isTouchDevice}, Canvas寬度=${canvasWidth}, 實際顯示寬度=${actualDisplayWidth}, 手機螢幕=${isMobileScreen}`);
         
         if (isTouchDevice && isMobileScreen) {
-            // 手機版：垂直排列，充分利用螢幕寬度
+            // 手機版：橫向滑動卡片
             return {
-                cardWidth: Math.min(300, actualDisplayWidth - 40), // 適應實際顯示寬度，留20px邊距
-                cardHeight: 120,  // 扁平卡片設計
-                cardSpacing: 15,  
+                cardWidth: Math.min(280, actualDisplayWidth - 60), // 稍微縮小適應滑動
+                cardHeight: 360,  // 保持較高的卡片
+                cardSpacing: 20,  
                 animationDuration: 0.5,
                 glitchIntensity: 1,
-                layout: 'vertical',  // 垂直布局
-                maxCardsPerRow: 1    // 每行最多1張卡片
+                layout: 'swipeable',  // 滑動布局
+                maxCardsPerRow: 1,    // 每次顯示1張卡片
+                enableSwipe: true     // 啟用滑動
             };
         } else {
             // PC版/平板版：橫向排列，正常大小
@@ -62,7 +70,8 @@ class UpgradeUI {
                 animationDuration: 0.5,
                 glitchIntensity: 2,
                 layout: 'horizontal', // 橫向布局
-                maxCardsPerRow: 3     // 每行最多3張卡片
+                maxCardsPerRow: 3,    // 每行最多3張卡片
+                enableSwipe: false    // 不啟用滑動
             };
         }
     }
@@ -98,14 +107,59 @@ class UpgradeUI {
         };
         this.game.canvas.addEventListener('click', this.eventHandlers.click);
         
-        // 觸控事件
+        // 觸控事件 - 支持滑動
         this.eventHandlers.touchstart = (e) => {
             if (!this.visible) return;
             e.preventDefault();
             const touch = e.touches[0];
-            this.handleClick(touch);
+            
+            if (this.config.enableSwipe) {
+                this.isDragging = true;
+                this.dragStartX = touch.clientX;
+                this.dragStartTime = Date.now();
+            } else {
+                this.handleClick(touch);
+            }
         };
         this.game.canvas.addEventListener('touchstart', this.eventHandlers.touchstart);
+        
+        // 觸控移動事件
+        this.eventHandlers.touchmove = (e) => {
+            if (!this.visible || !this.config.enableSwipe || !this.isDragging) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - this.dragStartX;
+            this.swipeOffset = deltaX;
+        };
+        this.game.canvas.addEventListener('touchmove', this.eventHandlers.touchmove);
+        
+        // 觸控結束事件
+        this.eventHandlers.touchend = (e) => {
+            if (!this.visible || !this.config.enableSwipe || !this.isDragging) return;
+            e.preventDefault();
+            
+            const deltaX = this.swipeOffset;
+            const deltaTime = Date.now() - this.dragStartTime;
+            const velocity = Math.abs(deltaX) / deltaTime;
+            
+            // 判斷滑動方向和速度
+            if (Math.abs(deltaX) > 50 || velocity > 0.3) {
+                if (deltaX > 0 && this.currentCardIndex > 0) {
+                    // 向右滑動，顯示上一張
+                    this.currentCardIndex--;
+                } else if (deltaX < 0 && this.currentCardIndex < this.upgradeChoices.length - 1) {
+                    // 向左滑動，顯示下一張
+                    this.currentCardIndex++;
+                }
+            }
+            
+            // 重置滑動狀態
+            this.isDragging = false;
+            this.swipeOffset = 0;
+            this.dragStartX = 0;
+            this.dragStartTime = 0;
+        };
+        this.game.canvas.addEventListener('touchend', this.eventHandlers.touchend);
         
         // 鍵盤事件
         this.eventHandlers.keydown = (e) => {
@@ -126,6 +180,12 @@ class UpgradeUI {
         }
         if (this.eventHandlers.touchstart) {
             this.game.canvas.removeEventListener('touchstart', this.eventHandlers.touchstart);
+        }
+        if (this.eventHandlers.touchmove) {
+            this.game.canvas.removeEventListener('touchmove', this.eventHandlers.touchmove);
+        }
+        if (this.eventHandlers.touchend) {
+            this.game.canvas.removeEventListener('touchend', this.eventHandlers.touchend);
         }
         
         // 移除文檔事件
@@ -152,6 +212,11 @@ class UpgradeUI {
         this.animationTime = 0;
         this.selectedIndex = -1;
         this.hoverIndex = -1;
+        
+        // 重置滑動狀態
+        this.currentCardIndex = 0;
+        this.swipeOffset = 0;
+        this.isDragging = false;
         
         // 暫停遊戲
         this.game.gameState.isPaused = true;
@@ -188,6 +253,12 @@ class UpgradeUI {
     
     // 處理點擊
     handleClick(e) {
+        if (this.config.layout === 'swipeable') {
+            // 滑動模式：點擊任意位置都選擇當前卡片
+            this.selectUpgrade(this.currentCardIndex);
+            return;
+        }
+        
         const rect = this.game.canvas.getBoundingClientRect();
         const scaleX = this.game.canvas.width / rect.width;
         const scaleY = this.game.canvas.height / rect.height;
@@ -243,7 +314,18 @@ class UpgradeUI {
         const centerY = this.game.canvas.height / 2;
         const positions = [];
         
-        if (this.config.layout === 'vertical') {
+        if (this.config.layout === 'swipeable') {
+            // 滑動布局 - 手機版，只顯示當前卡片
+            const cardX = centerX - this.config.cardWidth / 2 + this.swipeOffset;
+            const cardY = centerY - this.config.cardHeight / 2;
+            
+            // 只返回當前顯示的卡片位置
+            positions.push({
+                x: cardX,
+                y: cardY,
+                index: this.currentCardIndex
+            });
+        } else if (this.config.layout === 'vertical') {
             // 垂直布局 - 手機版，扁平卡片設計
             const totalHeight = this.config.cardHeight * 3 + this.config.cardSpacing * 2;
             const startY = Math.max(140, centerY - totalHeight / 2); // 距離頂部至少140px
@@ -251,7 +333,8 @@ class UpgradeUI {
             for (let i = 0; i < 3; i++) {
                 positions.push({
                     x: centerX - this.config.cardWidth / 2,
-                    y: startY + i * (this.config.cardHeight + this.config.cardSpacing)
+                    y: startY + i * (this.config.cardHeight + this.config.cardSpacing),
+                    index: i
                 });
             }
         } else {
@@ -262,7 +345,8 @@ class UpgradeUI {
             for (let i = 0; i < 3; i++) {
                 positions.push({
                     x: startX + i * (this.config.cardWidth + this.config.cardSpacing),
-                    y: centerY - this.config.cardHeight / 2
+                    y: centerY - this.config.cardHeight / 2,
+                    index: i
                 });
             }
         }
@@ -389,6 +473,11 @@ class UpgradeUI {
         // 渲染指令提示
         this.renderInstructions(ctx);
         
+        // 渲染滑動指示器（如果是滑動模式）
+        if (this.config.layout === 'swipeable') {
+            this.renderSwipeIndicator(ctx);
+        }
+        
         ctx.restore();
     }
     
@@ -492,13 +581,24 @@ class UpgradeUI {
         
         const positions = this.getCardPositions();
         
-        for (let i = 0; i < Math.min(3, this.upgradeChoices.length); i++) {
-            const upgrade = this.upgradeChoices[i];
-            const pos = positions[i];
+        if (this.config.layout === 'swipeable') {
+            // 滑動模式：只渲染當前卡片
+            const pos = positions[0];
+            const upgrade = this.upgradeChoices[this.currentCardIndex];
             
-            if (!upgrade || !pos) continue;
-            
-            this.renderUpgradeCard(ctx, upgrade, pos.x, pos.y, i);
+            if (upgrade && pos) {
+                this.renderUpgradeCard(ctx, upgrade, pos.x, pos.y, this.currentCardIndex);
+            }
+        } else {
+            // 其他模式：渲染所有卡片
+            for (let i = 0; i < Math.min(3, this.upgradeChoices.length); i++) {
+                const upgrade = this.upgradeChoices[i];
+                const pos = positions[i];
+                
+                if (!upgrade || !pos) continue;
+                
+                this.renderUpgradeCard(ctx, upgrade, pos.x, pos.y, i);
+            }
         }
     }
     
@@ -557,10 +657,10 @@ class UpgradeUI {
         ctx.fillRect(0, 0, this.config.cardWidth, 8);
         
         // 圖標位置 - 根據布局調整
-        const isVerticalLayout = this.config.layout === 'vertical';
-        const iconSize = isVerticalLayout ? 32 : 48;
-        const iconX = isVerticalLayout ? 50 : this.config.cardWidth / 2;
-        const iconY = isVerticalLayout ? this.config.cardHeight / 2 : 50;
+        const isCompactLayout = this.config.layout === 'vertical';
+        const iconSize = isCompactLayout ? 32 : 48;
+        const iconX = isCompactLayout ? 50 : this.config.cardWidth / 2;
+        const iconY = isCompactLayout ? this.config.cardHeight / 2 : 50;
         
         // console.log(`🎨 繪製圖標: ${upgrade.icon} 在 (${iconX}, ${iconY}), 大小: ${iconSize}, 顏色: ${qualityColor}`); // 移除調試日誌
         
@@ -578,7 +678,7 @@ class UpgradeUI {
             ctx.fillRect(iconX - 20, iconY - 20, 40, 40);
         }
         
-        if (isVerticalLayout) {
+        if (isCompactLayout) {
             // 手機版橫向布局：圖標左側，文字右側
             const textStartX = 90;
             
@@ -717,17 +817,57 @@ class UpgradeUI {
     renderInstructions(ctx) {
         const centerX = this.game.canvas.width / 2;
         const instructionY = this.game.canvas.height - 50;
-        const isMobile = this.config.layout === 'vertical';
         
         ctx.save();
-        ctx.font = isMobile ? '12px "Courier New", monospace' : '14px "Courier New", monospace';
+        ctx.font = '14px "Courier New", monospace';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
         ctx.shadowBlur = 5;
         ctx.shadowColor = '#ffffff';
         
-        const instructionText = isMobile ? '點擊卡片選擇升級' : '點擊或按 1-3 鍵選擇升級';
+        let instructionText;
+        if (this.config.layout === 'swipeable') {
+            instructionText = '左右滑動切換，點擊選擇升級';
+        } else if (this.config.layout === 'vertical') {
+            instructionText = '點擊卡片選擇升級';
+        } else {
+            instructionText = '點擊或按 1-3 鍵選擇升級';
+        }
+        
         ctx.fillText(instructionText, centerX, instructionY);
+        
+        ctx.restore();
+    }
+    
+    // 渲染滑動指示器
+    renderSwipeIndicator(ctx) {
+        const centerX = this.game.canvas.width / 2;
+        const indicatorY = this.game.canvas.height - 100;
+        const dotSize = 8;
+        const dotSpacing = 20;
+        
+        ctx.save();
+        
+        // 繪製三個指示點
+        for (let i = 0; i < 3; i++) {
+            const dotX = centerX - dotSpacing + i * dotSpacing;
+            const isActive = i === this.currentCardIndex;
+            
+            ctx.fillStyle = isActive ? '#00ffff' : 'rgba(255, 255, 255, 0.3)';
+            ctx.shadowBlur = isActive ? 10 : 0;
+            ctx.shadowColor = '#00ffff';
+            
+            ctx.beginPath();
+            ctx.arc(dotX, indicatorY, isActive ? dotSize : dotSize * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // 顯示當前卡片編號
+        ctx.font = '12px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 3;
+        ctx.fillText(`${this.currentCardIndex + 1} / 3`, centerX, indicatorY + 30);
         
         ctx.restore();
     }
