@@ -13,7 +13,6 @@ class MobileControls {
         this.createControls();
         this.detectMobile();
         
-        console.log('📱 MobileControls (瞄準手把版) 初始化完成');
     }
     
     // 檢測是否為手機設備
@@ -29,7 +28,6 @@ class MobileControls {
             this.disable();
         }
         
-        console.log(`📱 設備檢測: ${isMobile ? '手機 - 顯示瞄準手把' : '桌面 - 隱藏瞄準手把'}`);
     }
     
     // 創建控制界面
@@ -139,54 +137,62 @@ class MobileControls {
             
             // 檢查是否觸碰到UI元素，如果是則不顯示搖桿
             if (this.isTouchingUI(event.target)) {
-                console.log('🚫 觸碰到UI元素，不顯示搖桿:', event.target);
                 return;
             }
             touchId = touch.identifier;
             isActive = true;
             
-            // 設置手把位置在觸碰點
+            // 設置手把位置在觸碰點（邊界約束）
             const dpadSize = 120;
-            const x = Math.max(dpadSize/2, Math.min(window.innerWidth - dpadSize/2, touch.clientX));
-            const y = Math.max(dpadSize/2, Math.min(window.innerHeight - dpadSize/2, touch.clientY));
+            const adjustedX = Math.max(dpadSize/2, Math.min(window.innerWidth - dpadSize/2, touch.clientX));
+            const adjustedY = Math.max(dpadSize/2, Math.min(window.innerHeight - dpadSize/2, touch.clientY));
             
-            this.aimDpad.style.left = (x - dpadSize/2) + 'px';
-            this.aimDpad.style.top = (y - dpadSize/2) + 'px';
+            this.aimDpad.style.left = (adjustedX - dpadSize/2) + 'px';
+            this.aimDpad.style.top = (adjustedY - dpadSize/2) + 'px';
             
-            // 記錄中心位置
-            centerPos.x = touch.clientX;
-            centerPos.y = touch.clientY;
+            // 記錄調整後的中心位置，確保與視覺位置一致
+            centerPos.x = adjustedX;
+            centerPos.y = adjustedY;
             
-            // 顯示手把（但不立即改變攻擊方向）
+            
+            // 顯示手把並設置初始攻擊方向（指向觸碰位置）
             this.aimDpad.classList.add('visible');
-            // 不在這裡呼叫 updateAimDirection，因為只是顯示手把
+            // 設置初始攻擊方向為從基地指向觸碰位置
+            this.setInitialAttackDirection(adjustedX, adjustedY);
             
             event.preventDefault();
         });
         
-        // 觸控移動 - 只有在手把範圍內才控制瞄準方向
+        // 觸控移動 - 使用 capture 階段確保優先執行
         document.addEventListener('touchmove', (event) => {
             if (!isActive) return;
             
             // 找到對應的觸控點
             let currentTouch = null;
-            for (let i = 0; i < event.touches.length; i++) {
-                if (event.touches[i].identifier === touchId) {
-                    currentTouch = event.touches[i];
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                if (event.changedTouches[i].identifier === touchId) {
+                    currentTouch = event.changedTouches[i];
                     break;
                 }
             }
+            if (!currentTouch) return;
             
             if (currentTouch) {
+                // 對當前觸碰座標也進行邊界調整，確保與centerPos使用相同座標系統
+                const dpadSize = 120;
+                const adjustedCurrentX = Math.max(dpadSize/2, Math.min(window.innerWidth - dpadSize/2, currentTouch.clientX));
+                const adjustedCurrentY = Math.max(dpadSize/2, Math.min(window.innerHeight - dpadSize/2, currentTouch.clientY));
+                
                 // 檢查是否在手把有效控制範圍內
-                const deltaX = currentTouch.clientX - centerPos.x;
-                const deltaY = currentTouch.clientY - centerPos.y;
+                const deltaX = adjustedCurrentX - centerPos.x;
+                const deltaY = adjustedCurrentY - centerPos.y;
                 const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                 
+                
                 // 只有當移動距離超過閾值時才開始控制
-                if (distance > 15) { // 15px 的啟動閾值
+                if (distance > 3) { // 3px 的啟動閾值，提高響應靈敏度
                     this.aimDpad.classList.add('active');
-                    this.updateAimDirection(currentTouch.clientX, currentTouch.clientY, centerPos, knob, maxRadius);
+                    this.updateAimDirection(adjustedCurrentX, adjustedCurrentY, centerPos, knob, maxRadius);
                 } else {
                     // 在死區內，不控制方向
                     this.aimDpad.classList.remove('active', 'controlling');
@@ -195,7 +201,7 @@ class MobileControls {
             }
             
             event.preventDefault();
-        });
+        }, { capture: true, passive: false });
         
         // 觸控結束 - 隱藏手把
         const handleTouchEnd = (event) => {
@@ -268,6 +274,55 @@ class MobileControls {
         return false;
     }
     
+    // 設置初始攻擊方向（從遊戲中心指向觸碰位置）
+    setInitialAttackDirection(clientX, clientY) {
+        // 獲取遊戲畫布的基地位置
+        const game = window.currentGame;
+        const baseX = game?.base?.x || 400; // 遊戲座標
+        const baseY = game?.base?.y || 300; // 遊戲座標
+        
+        
+        // 將螢幕座標轉換為遊戲座標（考慮 object-fit: cover 的裁剪）
+        const canvas = document.getElementById('gameCanvas');
+        const rect = canvas.getBoundingClientRect();
+        
+        // 計算 object-fit: cover 的縮放和偏移
+        const gameAspectRatio = GameConfig.CANVAS.WIDTH / GameConfig.CANVAS.HEIGHT; // 800/600 = 1.33
+        const screenAspectRatio = rect.width / rect.height;
+        
+        let scale, offsetX, offsetY;
+        
+        if (screenAspectRatio > gameAspectRatio) {
+            // 螢幕較寬，左右被裁剪
+            scale = rect.height / GameConfig.CANVAS.HEIGHT;
+            offsetX = (rect.width - GameConfig.CANVAS.WIDTH * scale) / 2;
+            offsetY = 0;
+        } else {
+            // 螢幕較高，上下被裁剪
+            scale = rect.width / GameConfig.CANVAS.WIDTH;
+            offsetX = 0;
+            offsetY = (rect.height - GameConfig.CANVAS.HEIGHT * scale) / 2;
+        }
+        
+        // 轉換座標（考慮 cover 模式的偏移）
+        const gameX = (clientX - rect.left - offsetX) / scale;
+        const gameY = (clientY - rect.top - offsetY) / scale;
+        
+        
+        // 計算從基地到觸碰點的方向
+        const deltaX = gameX - baseX;
+        const deltaY = gameY - baseY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        if (distance > 0) {
+            this.attackDirection = {
+                x: deltaX / distance,
+                y: deltaY / distance
+            };
+            
+        }
+    }
+    
     // 更新瞄準方向
     updateAimDirection(clientX, clientY, startPos, knob, maxRadius) {
         const deltaX = clientX - startPos.x;
@@ -288,6 +343,7 @@ class MobileControls {
         
         this.attackDirection = { x: normalizedX, y: normalizedY };
         
+        
         if (clampedDistance > 10) {
             this.aimDpad.classList.add('controlling');
         } else {
@@ -298,7 +354,6 @@ class MobileControls {
     // 啟用手機控制
     enable() {
         this.isEnabled = true;
-        console.log('📱 觸碰顯示瞄準手把已啟用');
     }
     
     // 禁用手機控制
@@ -308,7 +363,6 @@ class MobileControls {
             this.aimDpad.classList.remove('visible', 'active', 'controlling');
         }
         this.attackDirection = { x: 0, y: 0 };
-        console.log('📱 觸碰顯示瞄準手把已禁用');
     }
     
     // 獲取攻擊方向
