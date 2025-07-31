@@ -261,26 +261,48 @@ class MobileControls {
                 if (distance > deadZone) {
                     this.aimDpad.classList.add('active', 'controlling');
                     
-                    // 瞄準線顯示搖桿方向
-                    aimLine.style.width = '60px';
-                    aimLine.style.transform = `rotate(${angle}rad)`;
-                    
-                    // 計算標準化的攻擊方向（-1 到 1）
-                    const normalizedX = deltaX / maxRadius;
-                    const normalizedY = deltaY / maxRadius;
-                    
-                    // 限制在單位圓內
-                    const magnitude = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
-                    if (magnitude > 1) {
-                        this.attackDirection = {
-                            x: normalizedX / magnitude,
-                            y: normalizedY / magnitude
-                        };
-                    } else {
-                        this.attackDirection = {
-                            x: normalizedX,
-                            y: normalizedY
-                        };
+                    // 重新計算基於遊戲座標的攻擊方向
+                    const game = window.currentGame;
+                    if (game && game.base) {
+                        const canvas = document.getElementById('gameCanvas');
+                        const rect = canvas.getBoundingClientRect();
+                        
+                        // 計算 object-fit: cover 的縮放和偏移
+                        const gameAspectRatio = GameConfig.CANVAS.WIDTH / GameConfig.CANVAS.HEIGHT;
+                        const screenAspectRatio = rect.width / rect.height;
+                        
+                        let scale, offsetX, offsetY;
+                        
+                        if (screenAspectRatio > gameAspectRatio) {
+                            scale = rect.height / GameConfig.CANVAS.HEIGHT;
+                            offsetX = (rect.width - GameConfig.CANVAS.WIDTH * scale) / 2;
+                            offsetY = 0;
+                        } else {
+                            scale = rect.width / GameConfig.CANVAS.WIDTH;
+                            offsetX = 0;
+                            offsetY = (rect.height - GameConfig.CANVAS.HEIGHT * scale) / 2;
+                        }
+                        
+                        // 轉換當前觸控座標到遊戲座標
+                        const gameX = (currentTouch.clientX - rect.left - offsetX) / scale;
+                        const gameY = (currentTouch.clientY - rect.top - offsetY) / scale;
+                        
+                        // 計算從基地到觸控點的方向
+                        const baseDeltaX = gameX - game.base.x;
+                        const baseDeltaY = gameY - game.base.y;
+                        const baseDistance = Math.sqrt(baseDeltaX * baseDeltaX + baseDeltaY * baseDeltaY);
+                        
+                        if (baseDistance > 0) {
+                            this.attackDirection = {
+                                x: baseDeltaX / baseDistance,
+                                y: baseDeltaY / baseDistance
+                            };
+                            
+                            // 瞄準線顯示實際攻擊方向
+                            const aimAngle = Math.atan2(this.attackDirection.y, this.attackDirection.x);
+                            aimLine.style.width = '60px';
+                            aimLine.style.transform = `rotate(${aimAngle}rad)`;
+                        }
                     }
                     
                     this.isAiming = true;
