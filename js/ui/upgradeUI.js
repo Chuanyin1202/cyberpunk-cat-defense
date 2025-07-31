@@ -32,15 +32,20 @@ class UpgradeUI {
     // 獲取UI配置 - 根據平台和螢幕尺寸調整
     getUIConfig() {
         const isTouchDevice = window.mobileControls && window.mobileControls.isEnabled;
-        const screenWidth = this.game.canvas.width;
         
-        // 檢查是否為小螢幕（手機）- 寬度小於700px使用垂直布局
-        const isNarrowScreen = screenWidth < 700;
+        // 使用實際顯示寬度而不是canvas內部寬度
+        const actualDisplayWidth = window.innerWidth;
+        const canvasWidth = this.game.canvas.width;
         
-        if (isTouchDevice && isNarrowScreen) {
+        // 手機檢測：觸控設備且實際螢幕寬度小於700px
+        const isMobileScreen = actualDisplayWidth < 700;
+        
+        console.log(`🔍 平台檢測: 觸控設備=${isTouchDevice}, Canvas寬度=${canvasWidth}, 實際顯示寬度=${actualDisplayWidth}, 手機螢幕=${isMobileScreen}`);
+        
+        if (isTouchDevice && isMobileScreen) {
             // 手機版：垂直排列，充分利用螢幕寬度
             return {
-                cardWidth: Math.min(300, screenWidth - 40), // 適應螢幕寬度，留20px邊距
+                cardWidth: Math.min(300, actualDisplayWidth - 40), // 適應實際顯示寬度，留20px邊距
                 cardHeight: 120,  // 扁平卡片設計
                 cardSpacing: 15,  
                 animationDuration: 0.5,
@@ -135,6 +140,10 @@ class UpgradeUI {
     // 顯示升級選擇
     show(upgradeChoices, callback) {
         console.log(`📋 UpgradeUI.show() 被調用，選項數量: ${upgradeChoices.length}`);
+        
+        // 重新獲取UI配置，確保使用最新的平台設定
+        this.config = this.getUIConfig();
+        console.log(`🔧 UI配置更新: 布局=${this.config.layout}, 卡片大小=${this.config.cardWidth}x${this.config.cardHeight}`);
         
         this.upgradeChoices = upgradeChoices;
         this.callback = callback;
