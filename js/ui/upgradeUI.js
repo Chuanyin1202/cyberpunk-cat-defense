@@ -13,14 +13,8 @@ class UpgradeUI {
         // 事件處理器引用
         this.eventHandlers = {};
         
-        // UI配置
-        this.config = {
-            cardWidth: 200,
-            cardHeight: 280,
-            cardSpacing: 50,
-            animationDuration: 0.5,
-            glitchIntensity: 2
-        };
+        // UI配置 - 會根據平台動態調整
+        this.config = this.getUIConfig();
         
         // 動畫狀態
         this.animationTime = 0;
@@ -33,6 +27,35 @@ class UpgradeUI {
         
         // 綁定事件
         this.bindEvents();
+    }
+    
+    // 獲取UI配置 - 根據平台調整
+    getUIConfig() {
+        const isMobile = window.mobileControls && window.mobileControls.isEnabled;
+        
+        if (isMobile) {
+            // 手機版：垂直排列，較小卡片
+            return {
+                cardWidth: 160,
+                cardHeight: 220,
+                cardSpacing: 20,
+                animationDuration: 0.5,
+                glitchIntensity: 1,
+                layout: 'vertical',  // 垂直布局
+                maxCardsPerRow: 1    // 每行最多1張卡片
+            };
+        } else {
+            // PC版：橫向排列，正常大小
+            return {
+                cardWidth: 200,
+                cardHeight: 280,
+                cardSpacing: 50,
+                animationDuration: 0.5,
+                glitchIntensity: 2,
+                layout: 'horizontal', // 橫向布局
+                maxCardsPerRow: 3     // 每行最多3張卡片
+            };
+        }
     }
     
     // 初始化背景粒子
@@ -184,25 +207,54 @@ class UpgradeUI {
         }
     }
     
-    // 獲取指定位置的卡片索引
+    // 獲取指定位置的卡片索引 - 支援多種布局
     getCardIndexAt(x, y) {
-        const centerX = this.game.canvas.width / 2;
-        const centerY = this.game.canvas.height / 2;
+        const positions = this.getCardPositions();
         
-        const totalWidth = this.config.cardWidth * 3 + this.config.cardSpacing * 2;
-        const startX = centerX - totalWidth / 2;
-        
-        for (let i = 0; i < 3; i++) {
-            const cardX = startX + i * (this.config.cardWidth + this.config.cardSpacing);
-            const cardY = centerY - this.config.cardHeight / 2;
+        for (let i = 0; i < Math.min(3, this.upgradeChoices.length); i++) {
+            const pos = positions[i];
+            if (!pos) continue;
             
-            if (x >= cardX && x <= cardX + this.config.cardWidth &&
-                y >= cardY && y <= cardY + this.config.cardHeight) {
+            if (x >= pos.x && x <= pos.x + this.config.cardWidth &&
+                y >= pos.y && y <= pos.y + this.config.cardHeight) {
                 return i;
             }
         }
         
         return -1;
+    }
+    
+    // 計算卡片位置 - 根據布局類型
+    getCardPositions() {
+        const centerX = this.game.canvas.width / 2;
+        const centerY = this.game.canvas.height / 2;
+        const positions = [];
+        
+        if (this.config.layout === 'vertical') {
+            // 垂直布局 - 手機版
+            const totalHeight = this.config.cardHeight * 3 + this.config.cardSpacing * 2;
+            const startY = centerY - totalHeight / 2;
+            
+            for (let i = 0; i < 3; i++) {
+                positions.push({
+                    x: centerX - this.config.cardWidth / 2,
+                    y: startY + i * (this.config.cardHeight + this.config.cardSpacing)
+                });
+            }
+        } else {
+            // 橫向布局 - PC版
+            const totalWidth = this.config.cardWidth * 3 + this.config.cardSpacing * 2;
+            const startX = centerX - totalWidth / 2;
+            
+            for (let i = 0; i < 3; i++) {
+                positions.push({
+                    x: startX + i * (this.config.cardWidth + this.config.cardSpacing),
+                    y: centerY - this.config.cardHeight / 2
+                });
+            }
+        }
+        
+        return positions;
     }
     
     // 選擇升級
@@ -237,12 +289,13 @@ class UpgradeUI {
     
     // 創建選擇特效
     createSelectionEffect(index) {
-        const centerX = this.game.canvas.width / 2;
-        const centerY = this.game.canvas.height / 2;
-        const totalWidth = this.config.cardWidth * 3 + this.config.cardSpacing * 2;
-        const startX = centerX - totalWidth / 2;
-        const cardX = startX + index * (this.config.cardWidth + this.config.cardSpacing) + this.config.cardWidth / 2;
-        const cardY = centerY;
+        const positions = this.getCardPositions();
+        const pos = positions[index];
+        
+        if (!pos) return;
+        
+        const cardX = pos.x + this.config.cardWidth / 2;
+        const cardY = pos.y + this.config.cardHeight / 2;
         
         // 添加粒子爆炸效果
         if (this.game.particleManager) {
@@ -424,21 +477,15 @@ class UpgradeUI {
             return;
         }
         
-        const centerX = this.game.canvas.width / 2;
-        const centerY = this.game.canvas.height / 2;
-        
-        const totalWidth = this.config.cardWidth * 3 + this.config.cardSpacing * 2;
-        const startX = centerX - totalWidth / 2;
+        const positions = this.getCardPositions();
         
         for (let i = 0; i < Math.min(3, this.upgradeChoices.length); i++) {
             const upgrade = this.upgradeChoices[i];
+            const pos = positions[i];
             
-            if (!upgrade) continue;
+            if (!upgrade || !pos) continue;
             
-            const cardX = startX + i * (this.config.cardWidth + this.config.cardSpacing);
-            const cardY = centerY - this.config.cardHeight / 2;
-            
-            this.renderUpgradeCard(ctx, upgrade, cardX, cardY, i);
+            this.renderUpgradeCard(ctx, upgrade, pos.x, pos.y, i);
         }
     }
     
@@ -608,15 +655,17 @@ class UpgradeUI {
     renderInstructions(ctx) {
         const centerX = this.game.canvas.width / 2;
         const instructionY = this.game.canvas.height - 50;
+        const isMobile = this.config.layout === 'vertical';
         
         ctx.save();
-        ctx.font = '14px "Courier New", monospace';
+        ctx.font = isMobile ? '12px "Courier New", monospace' : '14px "Courier New", monospace';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
         ctx.shadowBlur = 5;
         ctx.shadowColor = '#ffffff';
         
-        ctx.fillText('點擊或按 1-3 鍵選擇升級', centerX, instructionY);
+        const instructionText = isMobile ? '點擊卡片選擇升級' : '點擊或按 1-3 鍵選擇升級';
+        ctx.fillText(instructionText, centerX, instructionY);
         
         ctx.restore();
     }
