@@ -538,13 +538,21 @@ class CyberpunkCatDefense {
     handleMobileControlsInput() {
         if (!window.mobileControls || !mobileControls.isEnabled) return;
         
-        // 使用新的瞄準系統 - 直接獲取目標位置
-        const targetPos = mobileControls.getTargetPosition();
+        // 使用搖桿方向控制
+        const attackDir = mobileControls.getAttackDirection();
         
-        if (targetPos) {
-            // 直接使用觸控位置作為瞄準點
-            this.gameState.mouseX = targetPos.x;
-            this.gameState.mouseY = targetPos.y;
+        if (attackDir) {
+            // 使用方向計算瞄準點（增加範圍到 350）
+            const range = 350;
+            const targetX = this.base.x + attackDir.x * range;
+            const targetY = this.base.y + attackDir.y * range;
+            
+            // 確保瞄準點在畫布範圍內
+            const clampedX = Math.max(0, Math.min(GameConfig.CANVAS.WIDTH, targetX));
+            const clampedY = Math.max(0, Math.min(GameConfig.CANVAS.HEIGHT, targetY));
+            
+            this.gameState.mouseX = clampedX;
+            this.gameState.mouseY = clampedY;
         }
     }
     
