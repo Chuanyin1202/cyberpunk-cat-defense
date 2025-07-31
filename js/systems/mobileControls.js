@@ -259,12 +259,17 @@ class MobileControls {
                 if (distance > deadZone) {
                     this.aimDpad.classList.add('active', 'controlling');
                     
-                    // 更新瞄準線角度和長度
-                    aimLine.style.width = '60px';
-                    aimLine.style.transform = `rotate(${angle}rad)`;
-                    
-                    // 更新瞄準位置
+                    // 瞄準線應該指向實際的瞄準方向（從基地到觸控點）
+                    // 先更新瞄準位置以獲得正確的攻擊方向
                     this.updateTargetPosition(currentTouch.clientX, currentTouch.clientY);
+                    
+                    // 使用實際的攻擊方向來顯示瞄準線
+                    if (this.attackDirection.x !== 0 || this.attackDirection.y !== 0) {
+                        const aimAngle = Math.atan2(this.attackDirection.y, this.attackDirection.x);
+                        aimLine.style.width = '60px';
+                        aimLine.style.transform = `rotate(${aimAngle}rad)`;
+                    }
+                    
                     this.isAiming = true;
                 } else {
                     // 在死區內
