@@ -64,8 +64,8 @@ class UpgradeDefinitions {
             name: '量子漩渦',
             category: 'weapon',
             description: '創建吸引敵人的能量漩渦，造成持續傷害',
-            quality: 'epic',
-            minLevel: 2,
+            quality: 'rare',
+            minLevel: 1,
             icon: 'vortex',
             maxLevel: 3,
             levelEffects: [
@@ -177,8 +177,8 @@ class UpgradeDefinitions {
             name: '時空裂隙',
             category: 'weapon',
             description: '創建減緩敵人速度的時空扭曲區域',
-            quality: 'epic',
-            minLevel: 2,
+            quality: 'rare',
+            minLevel: 1,
             icon: 'rift',
             maxLevel: 3,
             levelEffects: [
@@ -398,7 +398,7 @@ class UpgradeDefinitions {
             category: 'ability',
             description: '暴擊率增加8%',
             quality: 'rare',
-            minLevel: 2,
+            minLevel: 1,
             icon: 'precision',
             effects: {
                 criticalChance: 0.08,  // 8%暴擊，3層=24%
@@ -448,7 +448,7 @@ class UpgradeDefinitions {
             category: 'survival',
             description: '每次擊殺回復1.5%血量',
             quality: 'rare',
-            minLevel: 2,
+            minLevel: 1,
             icon: 'steal',
             effects: {
                 lifeStealPercent: 0.015  // 1.5%，5層=7.5%
