@@ -34,7 +34,10 @@ class ExperienceSystem {
     
     // 獲得經驗值
     gainExperience(amount, source = 'kill') {
+        const oldExp = this.experience;
         this.experience += amount;
+        
+        // console.log(`💎 獲得經驗值: +${amount} (${source}), ${oldExp} → ${this.experience}/${this.experienceToNextLevel}`);
         
         // 創建獲得經驗值動畫
         this.createExpGainAnimation(amount, source);
@@ -74,7 +77,12 @@ class ExperienceSystem {
         // 下一級所需經驗值（線性增長）
         this.experienceToNextLevel = 100 + (this.level - 1) * 25;
         
-        console.log(`等級提升到 ${this.level}！下一級需要 ${this.experienceToNextLevel} 經驗值`);
+        console.log(`🎉 等級提升到 ${this.level}！下一級需要 ${this.experienceToNextLevel} 經驗值`);
+        
+        // 播放升級音效（如果有的話）
+        if (window.audioManager && window.audioManager.playSound) {
+            window.audioManager.playSound('levelUp');
+        }
     }
     
     // 獲取當前品質等級
@@ -139,83 +147,10 @@ class ExperienceSystem {
         }
     }
     
-    // 渲染極簡經驗值條（底部滿屏寬度）
+    // 移除經驗條，只渲染升級特效和經驗獲得動畫
     render(ctx) {
-        // 每幀都渲染，確保經驗條顯示
-        
-        ctx.save();
-        
-        // 檢查是否是手機版本
-        const isMobile = window.innerWidth <= 768;
-        
-        // 使用遊戲配置的邏輯尺寸
-        const logicalHeight = GameConfig.CANVAS.HEIGHT;
-        const logicalWidth = GameConfig.CANVAS.WIDTH;
-        
-        // 極簡底部經驗條
-        const barHeight = 4; // 固定高度
-        const barY = logicalHeight - barHeight; // 使用邏輯高度
-        const barWidth = logicalWidth; // 使用邏輯寬度
-        
-        // 經驗值進度
-        const expProgress = this.experience / this.experienceToNextLevel;
-        const qualityColor = this.getQualityColor();
-        
-        // 背景（更深的黑色背景）
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(0, barY, barWidth, barHeight);
-        
-        // 經驗值條填充（確保可見）
-        if (expProgress > 0) {
-            // 先畫一個稍微亮一點的底層
-            ctx.fillStyle = this.adjustAlpha(qualityColor, 0.3);
-            ctx.fillRect(0, barY, barWidth * expProgress, barHeight);
-            
-            // 再畫主要的填充
-            ctx.fillStyle = qualityColor;
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = qualityColor;
-            ctx.fillRect(0, barY, barWidth * expProgress, barHeight);
-        }
-        
-        // 整個經驗條的邊框（加粗）
-        ctx.strokeStyle = this.adjustAlpha(qualityColor, 0.8);
-        ctx.lineWidth = 2;
-        ctx.strokeRect(0, barY, barWidth, barHeight);
-        
-        // 頂部細邊框
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.beginPath();
-        ctx.moveTo(0, barY);
-        ctx.lineTo(barWidth, barY);
-        ctx.stroke();
-        
-        const fontSize = isMobile ? 20 : 16;
-        const expFontSize = isMobile ? 18 : 14;
-        const textY = barY - 10;
-        
-        // 等級文字（左下角，確保在安全區域內）
-        ctx.font = `bold ${fontSize}px "Courier New", monospace`;
-        ctx.textAlign = 'left';
-        ctx.fillStyle = qualityColor;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(0, 0, 0, 1)';
-        ctx.fillText(`LV.${this.level}`, 15, textY);
-        
-        // 經驗值數字（右下角，確保在安全區域內）
-        ctx.textAlign = 'right';
-        ctx.font = `${expFontSize}px "Courier New", monospace`;
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(0, 0, 0, 1)';
-        ctx.fillText(
-            `${this.experience}/${this.experienceToNextLevel}`, 
-            logicalWidth - 15, textY
-        );
-        
-        // 渲染完成
-        
-        ctx.restore();
+        // 在基地上方顯示等級
+        this.renderLevelIndicator(ctx);
         
         // 渲染升級特效
         if (this.levelUpEffect) {
@@ -224,6 +159,59 @@ class ExperienceSystem {
         
         // 渲染經驗值獲得動畫
         this.renderExpGainAnimations(ctx);
+    }
+    
+    // 渲染等級指示器（在基地上方）
+    renderLevelIndicator(ctx) {
+        ctx.save();
+        
+        // 獲取基地位置
+        const game = window.currentGame;
+        const baseX = game?.base?.x || 400;
+        const baseY = game?.base?.y || 300;
+        
+        // 位置在基地上方
+        const indicatorY = baseY - 60;
+        
+        // 品質顏色
+        const qualityColor = this.getQualityColor();
+        
+        // 等級背景
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(baseX - 40, indicatorY - 15, 80, 25);
+        
+        // 等級邊框
+        ctx.strokeStyle = qualityColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(baseX - 40, indicatorY - 15, 80, 25);
+        
+        // 等級文字
+        ctx.font = 'bold 16px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = qualityColor;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = qualityColor;
+        ctx.fillText(`LV.${this.level}`, baseX, indicatorY);
+        
+        // 經驗進度小提示（小圓點）
+        const expProgress = this.experience / this.experienceToNextLevel;
+        const dotCount = 5;
+        const dotSpacing = 10;
+        const startX = baseX - (dotCount - 1) * dotSpacing / 2;
+        
+        for (let i = 0; i < dotCount; i++) {
+            const dotX = startX + i * dotSpacing;
+            const dotY = indicatorY + 10;
+            const filled = i < Math.floor(expProgress * dotCount);
+            
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+            ctx.fillStyle = filled ? qualityColor : 'rgba(255, 255, 255, 0.2)';
+            ctx.fill();
+        }
+        
+        ctx.restore();
     }
     
     // 能量條已整合到基地視覺效果中，此方法已棄用

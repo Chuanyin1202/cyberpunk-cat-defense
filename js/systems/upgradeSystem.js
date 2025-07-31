@@ -1060,6 +1060,8 @@ class UpgradeSystem {
         // 如果升級UI不可見，渲染經驗條
         if (!this.upgradeUI.visible) {
             this.experienceSystem.render(ctx);
+        } else if (Math.random() < 0.01) {
+            console.log('⚠️ 升級UI可見，經驗條未渲染');
         }
     }
     
