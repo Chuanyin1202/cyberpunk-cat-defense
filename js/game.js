@@ -78,8 +78,8 @@ class CyberpunkCatDefense {
             // 記錄螢幕狀態
             this.isPortraitMode = isPortrait && isMobile;
             
-            // 設定手機渲染縮放係數（再次調小到合適大小）
-            this.mobileRenderScale = (this.isPortraitMode) ? 1.1 : 1.0;
+            // 設定手機渲染縮放係數（直屏時縮小基地）
+            this.mobileRenderScale = (this.isPortraitMode) ? 0.75 : 1.0;
             
             // 重置繪圖上下文的變換矩陣
             this.ctx.setTransform(1, 0, 0, 1, 0, 0);
