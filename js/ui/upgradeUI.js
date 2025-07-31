@@ -38,11 +38,11 @@ class UpgradeUI {
         const isNarrowScreen = screenWidth < 700;
         
         if (isTouchDevice && isNarrowScreen) {
-            // 手機版：垂直排列，較小卡片
+            // 手機版：垂直排列，充分利用螢幕寬度
             return {
-                cardWidth: 160,
-                cardHeight: 220,
-                cardSpacing: 20,
+                cardWidth: Math.min(300, screenWidth - 40), // 適應螢幕寬度，留20px邊距
+                cardHeight: 120,  // 扁平卡片設計
+                cardSpacing: 15,  
                 animationDuration: 0.5,
                 glitchIntensity: 1,
                 layout: 'vertical',  // 垂直布局
@@ -235,9 +235,9 @@ class UpgradeUI {
         const positions = [];
         
         if (this.config.layout === 'vertical') {
-            // 垂直布局 - 手機版
+            // 垂直布局 - 手機版，扁平卡片設計
             const totalHeight = this.config.cardHeight * 3 + this.config.cardSpacing * 2;
-            const startY = centerY - totalHeight / 2;
+            const startY = Math.max(140, centerY - totalHeight / 2); // 距離頂部至少140px
             
             for (let i = 0; i < 3; i++) {
                 positions.push({
@@ -547,10 +547,11 @@ class UpgradeUI {
         ctx.fillStyle = qualityColor;
         ctx.fillRect(0, 0, this.config.cardWidth, 8);
         
-        // 圖標
-        const iconSize = 48;
-        const iconX = this.config.cardWidth / 2;
-        const iconY = 50;
+        // 圖標位置 - 根據布局調整
+        const isVerticalLayout = this.config.layout === 'vertical';
+        const iconSize = isVerticalLayout ? 32 : 48;
+        const iconX = isVerticalLayout ? 50 : this.config.cardWidth / 2;
+        const iconY = isVerticalLayout ? this.config.cardHeight / 2 : 50;
         
         // console.log(`🎨 繪製圖標: ${upgrade.icon} 在 (${iconX}, ${iconY}), 大小: ${iconSize}, 顏色: ${qualityColor}`); // 移除調試日誌
         
@@ -568,46 +569,94 @@ class UpgradeUI {
             ctx.fillRect(iconX - 20, iconY - 20, 40, 40);
         }
         
-        // 升級名稱
-        ctx.font = 'bold 16px "Courier New", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = qualityColor;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = qualityColor;
-        ctx.fillText(upgrade.name, this.config.cardWidth / 2, 120);
-        
-        // 類別標籤
-        ctx.font = '12px "Courier New", monospace';
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 3;
-        const categoryText = {
-            weapon: '武器',
-            ability: '能力',
-            survival: '生存'
-        }[upgrade.category] || upgrade.category;
-        ctx.fillText(`[${categoryText}]`, this.config.cardWidth / 2, 140);
-        
-        // 描述文字
-        ctx.font = '12px "Courier New", monospace';
-        ctx.fillStyle = '#cccccc';
-        ctx.shadowBlur = 2;
-        
-        const description = upgrade.description;
-        const maxCharsPerLine = 18;
-        const lines = this.wrapText(description, maxCharsPerLine);
-        
-        for (let i = 0; i < lines.length && i < 4; i++) {
-            ctx.fillText(lines[i], this.config.cardWidth / 2, 165 + i * 16);
-        }
-        
-        // 風味文字
-        if (upgrade.flavorText) {
-            ctx.font = 'italic 10px "Courier New", monospace';
+        if (isVerticalLayout) {
+            // 手機版橫向布局：圖標左側，文字右側
+            const textStartX = 90;
+            
+            // 升級名稱
+            ctx.font = 'bold 14px "Courier New", monospace';
+            ctx.textAlign = 'left';
             ctx.fillStyle = qualityColor;
-            ctx.globalAlpha = 0.8;
-            const flavorLines = this.wrapText(upgrade.flavorText, 20);
-            for (let i = 0; i < flavorLines.length && i < 2; i++) {
-                ctx.fillText(flavorLines[i], this.config.cardWidth / 2, 240 + i * 12);
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = qualityColor;
+            ctx.fillText(upgrade.name, textStartX, 30);
+            
+            // 類別標籤  
+            ctx.font = '10px "Courier New", monospace';
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 3;
+            const categoryText = {
+                weapon: '武器',
+                ability: '能力', 
+                survival: '生存'
+            }[upgrade.category] || upgrade.category;
+            ctx.fillText(`[${categoryText}]`, textStartX, 45);
+            
+            // 描述文字
+            ctx.font = '10px "Courier New", monospace';
+            ctx.fillStyle = '#cccccc';
+            ctx.shadowBlur = 2;
+            
+            const description = upgrade.description;
+            const maxCharsPerLine = Math.floor((this.config.cardWidth - textStartX - 10) / 6); // 估算字符數
+            const lines = this.wrapText(description, maxCharsPerLine);
+            
+            for (let i = 0; i < lines.length && i < 3; i++) {
+                ctx.fillText(lines[i], textStartX, 65 + i * 12);
+            }
+            
+            // 風味文字
+            if (upgrade.flavorText) {
+                ctx.font = 'italic 8px "Courier New", monospace';
+                ctx.fillStyle = qualityColor;
+                ctx.globalAlpha = 0.6;
+                const flavorLines = this.wrapText(upgrade.flavorText, maxCharsPerLine);
+                for (let i = 0; i < flavorLines.length && i < 1; i++) {
+                    ctx.fillText(flavorLines[i], textStartX, 100 + i * 10);
+                }
+            }
+        } else {
+            // PC版垂直布局：保持原有設計
+            ctx.font = 'bold 16px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = qualityColor;
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = qualityColor;
+            ctx.fillText(upgrade.name, this.config.cardWidth / 2, 120);
+            
+            // 類別標籤
+            ctx.font = '12px "Courier New", monospace';
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 3;
+            const categoryText = {
+                weapon: '武器',
+                ability: '能力',
+                survival: '生存'
+            }[upgrade.category] || upgrade.category;
+            ctx.fillText(`[${categoryText}]`, this.config.cardWidth / 2, 140);
+            
+            // 描述文字
+            ctx.font = '12px "Courier New", monospace';
+            ctx.fillStyle = '#cccccc';
+            ctx.shadowBlur = 2;
+            
+            const description = upgrade.description;
+            const maxCharsPerLine = 18;
+            const lines = this.wrapText(description, maxCharsPerLine);
+            
+            for (let i = 0; i < lines.length && i < 4; i++) {
+                ctx.fillText(lines[i], this.config.cardWidth / 2, 165 + i * 16);
+            }
+            
+            // 風味文字
+            if (upgrade.flavorText) {
+                ctx.font = 'italic 10px "Courier New", monospace';
+                ctx.fillStyle = qualityColor;
+                ctx.globalAlpha = 0.8;
+                const flavorLines = this.wrapText(upgrade.flavorText, 20);
+                for (let i = 0; i < flavorLines.length && i < 2; i++) {
+                    ctx.fillText(flavorLines[i], this.config.cardWidth / 2, 240 + i * 12);
+                }
             }
         }
         
