@@ -104,8 +104,13 @@ class PlatformConfig {
 
     // 獲取當前平台設定
     static getCurrentPlatformConfig() {
-        const isMobile = window.mobileControls && window.mobileControls.isEnabled;
-        return isMobile ? this.MOBILE : this.PC;
+        const isTouchDevice = window.mobileControls && window.mobileControls.isEnabled;
+        const actualDisplayWidth = window.innerWidth;
+        
+        // 只有觸控設備且螢幕寬度小於700px才使用手機設定
+        const isMobileDevice = isTouchDevice && actualDisplayWidth < 700;
+        
+        return isMobileDevice ? this.MOBILE : this.PC;
     }
 
     // 獲取平台特定的敵人設定
@@ -138,7 +143,13 @@ class PlatformConfig {
 
     // 獲取當前平台類型
     static getCurrentPlatform() {
-        return (window.mobileControls && window.mobileControls.isEnabled) ? 'mobile' : 'pc';
+        const isTouchDevice = window.mobileControls && window.mobileControls.isEnabled;
+        const actualDisplayWidth = window.innerWidth;
+        const isMobileDevice = isTouchDevice && actualDisplayWidth < 700;
+        
+        if (isMobileDevice) return 'mobile';
+        if (isTouchDevice) return 'tablet';
+        return 'pc';
     }
 
     // 獲取合併的設定（通用+平台特定）

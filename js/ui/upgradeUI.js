@@ -50,7 +50,8 @@ class UpgradeUI {
         console.log(`🔍 平台檢測: 觸控設備=${isTouchDevice}, Canvas寬度=${canvasWidth}, 實際顯示寬度=${actualDisplayWidth}, 手機螢幕=${isMobileScreen}`);
         
         if (isTouchDevice && isMobileScreen) {
-            // 手機版：橫向滑動卡片
+            // 手機版：橫向滑動卡片（窄螢幕觸控設備）
+            console.log(`📱 使用手機版滑動布局`);
             return {
                 cardWidth: Math.min(280, actualDisplayWidth - 60), // 稍微縮小適應滑動
                 cardHeight: 360,  // 保持較高的卡片
@@ -62,7 +63,9 @@ class UpgradeUI {
                 enableSwipe: true     // 啟用滑動
             };
         } else {
-            // PC版/平板版：橫向排列，正常大小
+            // PC版/平板版：橫向排列，正常大小（寬螢幕或非觸控設備）
+            const deviceType = isTouchDevice ? '平板版' : 'PC版';
+            console.log(`💻 使用${deviceType}橫向布局`);
             return {
                 cardWidth: 200,
                 cardHeight: 280,
