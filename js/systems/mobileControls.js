@@ -178,51 +178,9 @@ class MobileControls {
             // 顯示手把
             this.aimDpad.classList.add('visible');
             
-            // 計算初始攻擊方向（從基地指向觸控點）
-            const game = window.currentGame;
-            if (game && game.base) {
-                const canvas = document.getElementById('gameCanvas');
-                const rect = canvas.getBoundingClientRect();
-                
-                // 計算 object-fit: cover 的縮放和偏移
-                const gameAspectRatio = GameConfig.CANVAS.WIDTH / GameConfig.CANVAS.HEIGHT;
-                const screenAspectRatio = rect.width / rect.height;
-                
-                let scale, offsetX, offsetY;
-                
-                if (screenAspectRatio > gameAspectRatio) {
-                    scale = rect.height / GameConfig.CANVAS.HEIGHT;
-                    offsetX = (rect.width - GameConfig.CANVAS.WIDTH * scale) / 2;
-                    offsetY = 0;
-                } else {
-                    scale = rect.width / GameConfig.CANVAS.WIDTH;
-                    offsetX = 0;
-                    offsetY = (rect.height - GameConfig.CANVAS.HEIGHT * scale) / 2;
-                }
-                
-                // 轉換觸控座標到遊戲座標
-                const gameX = (touch.clientX - rect.left - offsetX) / scale;
-                const gameY = (touch.clientY - rect.top - offsetY) / scale;
-                
-                // 計算從基地到觸控點的方向
-                const deltaX = gameX - game.base.x;
-                const deltaY = gameY - game.base.y;
-                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                
-                if (distance > 0) {
-                    this.attackDirection = {
-                        x: deltaX / distance,
-                        y: deltaY / distance
-                    };
-                    this.isAiming = true;
-                } else {
-                    this.attackDirection = { x: 0, y: 0 };
-                    this.isAiming = false;
-                }
-            } else {
-                this.attackDirection = { x: 0, y: 0 };
-                this.isAiming = false;
-            }
+            // 初始時不設置攻擊方向，等待拖動
+            this.attackDirection = { x: 0, y: 0 };
+            this.isAiming = false;
             
             event.preventDefault();
         });
@@ -261,49 +219,19 @@ class MobileControls {
                 if (distance > deadZone) {
                     this.aimDpad.classList.add('active', 'controlling');
                     
-                    // 重新計算基於遊戲座標的攻擊方向
-                    const game = window.currentGame;
-                    if (game && game.base) {
-                        const canvas = document.getElementById('gameCanvas');
-                        const rect = canvas.getBoundingClientRect();
-                        
-                        // 計算 object-fit: cover 的縮放和偏移
-                        const gameAspectRatio = GameConfig.CANVAS.WIDTH / GameConfig.CANVAS.HEIGHT;
-                        const screenAspectRatio = rect.width / rect.height;
-                        
-                        let scale, offsetX, offsetY;
-                        
-                        if (screenAspectRatio > gameAspectRatio) {
-                            scale = rect.height / GameConfig.CANVAS.HEIGHT;
-                            offsetX = (rect.width - GameConfig.CANVAS.WIDTH * scale) / 2;
-                            offsetY = 0;
-                        } else {
-                            scale = rect.width / GameConfig.CANVAS.WIDTH;
-                            offsetX = 0;
-                            offsetY = (rect.height - GameConfig.CANVAS.HEIGHT * scale) / 2;
-                        }
-                        
-                        // 轉換當前觸控座標到遊戲座標
-                        const gameX = (currentTouch.clientX - rect.left - offsetX) / scale;
-                        const gameY = (currentTouch.clientY - rect.top - offsetY) / scale;
-                        
-                        // 計算從基地到觸控點的方向
-                        const baseDeltaX = gameX - game.base.x;
-                        const baseDeltaY = gameY - game.base.y;
-                        const baseDistance = Math.sqrt(baseDeltaX * baseDeltaX + baseDeltaY * baseDeltaY);
-                        
-                        if (baseDistance > 0) {
-                            this.attackDirection = {
-                                x: baseDeltaX / baseDistance,
-                                y: baseDeltaY / baseDistance
-                            };
-                            
-                            // 瞄準線顯示實際攻擊方向
-                            const aimAngle = Math.atan2(this.attackDirection.y, this.attackDirection.x);
-                            aimLine.style.width = '60px';
-                            aimLine.style.transform = `rotate(${aimAngle}rad)`;
-                        }
-                    }
+                    // 使用搖桿的相對位置作為方向
+                    // 瞄準線顯示搖桿方向
+                    aimLine.style.width = '60px';
+                    aimLine.style.transform = `rotate(${angle}rad)`;
+                    
+                    // 計算標準化的攻擊方向（基於搖桿位移）
+                    const dirX = Math.cos(angle);
+                    const dirY = Math.sin(angle);
+                    
+                    this.attackDirection = {
+                        x: dirX,
+                        y: dirY
+                    };
                     
                     this.isAiming = true;
                 } else {
