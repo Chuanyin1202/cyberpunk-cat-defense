@@ -109,7 +109,7 @@ class BulletSystem {
     // 方向性攻擊 - 朝滑鼠方向發射
     fireDirectional(currentTime) {
         // 檢查是否有滑鼠位置
-        if (!this.game.gameState.mouseX || !this.game.gameState.mouseY) {
+        if (this.game.gameState.mouseX === null || this.game.gameState.mouseY === null) {
             return; // 沒有滑鼠位置就不攻擊
         }
         
@@ -129,6 +129,7 @@ class BulletSystem {
             const dx = this.game.gameState.mouseX - this.base.x;
             const dy = this.game.gameState.mouseY - this.base.y;
             const mouseAngle = Math.atan2(dy, dx);
+            
             
             
             this.firePatternDirectional(this.currentPattern, mouseAngle);
@@ -349,11 +350,14 @@ class BulletSystem {
     
     // 創建彈幕
     createBullet(config) {
+        const vx = Math.cos(config.angle) * config.speed;
+        const vy = Math.sin(config.angle) * config.speed;
+        
         const bullet = {
             x: config.x,
             y: config.y,
-            vx: Math.cos(config.angle) * config.speed,
-            vy: Math.sin(config.angle) * config.speed,
+            vx: vx,
+            vy: vy,
             damage: config.damage,
             size: config.size,
             color: config.color,

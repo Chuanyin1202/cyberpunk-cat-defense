@@ -9,7 +9,6 @@ class MobileControls {
         
         // 瞄準方向
         this.attackDirection = { x: 0, y: 0 };
-        this.isAiming = false;
         
         this.createControls();
         this.detectMobile();
@@ -36,7 +35,6 @@ class MobileControls {
         // 創建瞄準手把 (初始隱藏，觸碰時顯示)
         this.aimDpad = this.createAimPad();
         document.body.appendChild(this.aimDpad);
-        
         this.setupScreenTouchEvents();
     }
     
@@ -49,8 +47,8 @@ class MobileControls {
             <style>
             .mobile-aimpad {
                 position: fixed;
-                width: 140px;
-                height: 140px;
+                width: 120px;
+                height: 120px;
                 opacity: 0;
                 pointer-events: none;
                 z-index: 1000;
@@ -88,8 +86,8 @@ class MobileControls {
                 position: relative;
             }
             .joystick-bg {
-                width: 100px;
-                height: 100px;
+                width: 90px;
+                height: 90px;
                 border: 2px solid #00ffff;
                 border-radius: 50%;
                 background: rgba(0, 255, 255, 0.1);
@@ -100,8 +98,8 @@ class MobileControls {
                 box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
             }
             .joystick-knob {
-                width: 40px;
-                height: 40px;
+                width: 30px;
+                height: 30px;
                 background: #00ffff;
                 border-radius: 50%;
                 position: absolute;
@@ -110,29 +108,12 @@ class MobileControls {
                 transform: translate(-50%, -50%);
                 box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
                 transition: none;
-                pointer-events: none;
-            }
-            .aim-line {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                width: 0;
-                height: 2px;
-                background: linear-gradient(to right, transparent, #ff00ff);
-                transform-origin: left center;
-                opacity: 0;
-                transition: opacity 0.2s;
-                pointer-events: none;
-            }
-            .mobile-aimpad.active .aim-line {
-                opacity: 0.6;
             }
             </style>
             <div class="aim-label">瞄準</div>
             <div class="joystick-container">
                 <div class="joystick-bg">
                     <div class="joystick-knob"></div>
-                    <div class="aim-line"></div>
                 </div>
             </div>
         `;
@@ -144,11 +125,9 @@ class MobileControls {
         let isActive = false;
         let touchId = null;
         let centerPos = { x: 0, y: 0 };
-        const maxRadius = 50;  // 增加最大半徑
-        const deadZone = 15;   // 增加死區
+        const maxRadius = 45;
         
         const knob = this.aimDpad.querySelector('.joystick-knob');
-        const aimLine = this.aimDpad.querySelector('.aim-line');
         
         // 觸控開始 - 在觸碰位置顯示手把
         document.addEventListener('touchstart', (event) => {
@@ -164,7 +143,7 @@ class MobileControls {
             isActive = true;
             
             // 設置手把位置在觸碰點（邊界約束）
-            const dpadSize = 140;  // 更新為新尺寸
+            const dpadSize = 120;
             const adjustedX = Math.max(dpadSize/2, Math.min(window.innerWidth - dpadSize/2, touch.clientX));
             const adjustedY = Math.max(dpadSize/2, Math.min(window.innerHeight - dpadSize/2, touch.clientY));
             
@@ -175,12 +154,11 @@ class MobileControls {
             centerPos.x = adjustedX;
             centerPos.y = adjustedY;
             
-            // 顯示手把
-            this.aimDpad.classList.add('visible');
             
-            // 初始時不設置攻擊方向，等待拖動
-            this.attackDirection = { x: 0, y: 0 };
-            this.isAiming = false;
+            // 顯示手把並設置初始攻擊方向（指向觸碰位置）
+            this.aimDpad.classList.add('visible');
+            // 設置初始攻擊方向為從基地指向觸碰位置
+            this.setInitialAttackDirection(adjustedX, adjustedY);
             
             event.preventDefault();
         });
@@ -200,44 +178,19 @@ class MobileControls {
             if (!currentTouch) return;
             
             if (currentTouch) {
+                // 直接使用原始觸控座標，不進行邊界調整（避免抖動）
                 const deltaX = currentTouch.clientX - centerPos.x;
                 const deltaY = currentTouch.clientY - centerPos.y;
                 const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                 
-                // 更新手把視覺
-                const clampedDistance = Math.min(distance, maxRadius);
-                const angle = Math.atan2(deltaY, deltaX);
                 
-                // 計算knob位置
-                const knobX = Math.cos(angle) * clampedDistance;
-                const knobY = Math.sin(angle) * clampedDistance;
-                
-                // 更新knob位置（使用正確的中心偏移）
-                knob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
-                
-                // 更新瞄準線和攻擊方向
-                if (distance > deadZone) {
-                    this.aimDpad.classList.add('active', 'controlling');
-                    
-                    // 使用搖桿的相對位置作為方向
-                    // 瞄準線顯示搖桿方向
-                    aimLine.style.width = '60px';
-                    aimLine.style.transform = `rotate(${angle}rad)`;
-                    
-                    // 計算標準化的攻擊方向（基於搖桿位移）
-                    const dirX = Math.cos(angle);
-                    const dirY = Math.sin(angle);
-                    
-                    this.attackDirection = {
-                        x: dirX,
-                        y: dirY
-                    };
-                    
-                    this.isAiming = true;
+                // 只有當移動距離超過閾值時才開始控制
+                if (distance > 10) { // 增大死區，避免微小移動造成抖動
+                    this.aimDpad.classList.add('active');
+                    this.updateAimDirection(currentTouch.clientX, currentTouch.clientY, centerPos, knob, maxRadius);
                 } else {
-                    // 在死區內
+                    // 在死區內，不控制方向
                     this.aimDpad.classList.remove('active', 'controlling');
-                    this.isAiming = false;
                     this.attackDirection = { x: 0, y: 0 };
                 }
             }
@@ -258,9 +211,7 @@ class MobileControls {
                     // 隱藏手把
                     this.aimDpad.classList.remove('visible', 'active', 'controlling');
                     knob.style.transform = 'translate(-50%, -50%)';
-                    aimLine.style.width = '0';
                     this.attackDirection = { x: 0, y: 0 };
-                    this.isAiming = false;
                     
                     event.preventDefault();
                     break;
@@ -318,7 +269,82 @@ class MobileControls {
         return false;
     }
     
+    // 設置初始攻擊方向（從遊戲中心指向觸碰位置）
+    setInitialAttackDirection(clientX, clientY) {
+        // 獲取遊戲畫布的基地位置
+        const game = window.currentGame;
+        const baseX = game?.base?.x || 400; // 遊戲座標
+        const baseY = game?.base?.y || 300; // 遊戲座標
+        
+        
+        // 將螢幕座標轉換為遊戲座標（考慮 object-fit: cover 的裁剪）
+        const canvas = document.getElementById('gameCanvas');
+        const rect = canvas.getBoundingClientRect();
+        
+        // 計算 object-fit: cover 的縮放和偏移
+        const gameAspectRatio = GameConfig.CANVAS.WIDTH / GameConfig.CANVAS.HEIGHT; // 800/600 = 1.33
+        const screenAspectRatio = rect.width / rect.height;
+        
+        let scale, offsetX, offsetY;
+        
+        if (screenAspectRatio > gameAspectRatio) {
+            // 螢幕較寬，左右被裁剪
+            scale = rect.height / GameConfig.CANVAS.HEIGHT;
+            offsetX = (rect.width - GameConfig.CANVAS.WIDTH * scale) / 2;
+            offsetY = 0;
+        } else {
+            // 螢幕較高，上下被裁剪
+            scale = rect.width / GameConfig.CANVAS.WIDTH;
+            offsetX = 0;
+            offsetY = (rect.height - GameConfig.CANVAS.HEIGHT * scale) / 2;
+        }
+        
+        // 轉換座標（考慮 cover 模式的偏移）
+        const gameX = (clientX - rect.left - offsetX) / scale;
+        const gameY = (clientY - rect.top - offsetY) / scale;
+        
+        
+        // 計算從基地到觸碰點的方向
+        const deltaX = gameX - baseX;
+        const deltaY = gameY - baseY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        if (distance > 0) {
+            this.attackDirection = {
+                x: deltaX / distance,
+                y: deltaY / distance
+            };
+            
+        }
+    }
     
+    // 更新瞄準方向
+    updateAimDirection(clientX, clientY, startPos, knob, maxRadius) {
+        const deltaX = clientX - startPos.x;
+        const deltaY = clientY - startPos.y;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        const clampedDistance = Math.min(distance, maxRadius);
+        const angle = Math.atan2(deltaY, deltaX);
+        
+        const knobX = Math.cos(angle) * clampedDistance;
+        const knobY = Math.sin(angle) * clampedDistance;
+        
+        knob.style.transform = `translate(${knobX - 15}px, ${knobY - 15}px)`;
+        
+        // 計算標準化瞄準方向
+        const normalizedX = clampedDistance > 10 ? knobX / maxRadius : 0;
+        const normalizedY = clampedDistance > 10 ? knobY / maxRadius : 0;
+        
+        this.attackDirection = { x: normalizedX, y: normalizedY };
+        
+        
+        if (clampedDistance > 10) {
+            this.aimDpad.classList.add('controlling');
+        } else {
+            this.aimDpad.classList.remove('controlling');
+        }
+    }
     
     // 啟用手機控制
     enable() {
@@ -336,14 +362,14 @@ class MobileControls {
     
     // 獲取攻擊方向
     getAttackDirection() {
-        if (!this.isEnabled || !this.isAiming) return null;
+        if (!this.isEnabled) return null;
+        if (this.attackDirection.x === 0 && this.attackDirection.y === 0) return null;
         return { x: this.attackDirection.x, y: this.attackDirection.y };
     }
     
-    
     // 是否正在瞄準
     isAttacking() {
-        return this.isEnabled && this.isAiming;
+        return this.isEnabled && (this.attackDirection.x !== 0 || this.attackDirection.y !== 0);
     }
     
     // 相容性方法（遊戲代碼可能會調用）

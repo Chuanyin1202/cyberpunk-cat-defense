@@ -526,6 +526,11 @@ class CyberpunkCatDefense {
     
     // 處理滑鼠移動
     handleMouseMove(event) {
+        // 在手機上禁用滑鼠事件處理，避免與觸控衝突
+        if (window.mobileControls && window.mobileControls.isEnabled) {
+            return;
+        }
+        
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = GameConfig.CANVAS.WIDTH / rect.width;
         const scaleY = GameConfig.CANVAS.HEIGHT / rect.height;
