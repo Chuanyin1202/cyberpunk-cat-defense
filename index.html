@@ -111,18 +111,18 @@
                 font-size: 14px;
                 font-weight: normal;
                 text-shadow: 1px 1px 3px rgba(0, 0, 0, 1);
-                background: rgba(0, 0, 0, 0.5);
+                background: transparent;
                 border-radius: 3px;
                 padding: 4px 8px;
                 border: none;
                 line-height: 1.1;
-                backdrop-filter: blur(3px);
+                backdrop-filter: none;
             }
             
             .ui-panel {
                 padding: 4px 8px;
-                background: rgba(0, 0, 0, 0.5);
-                backdrop-filter: blur(3px);
+                background: transparent;
+                backdrop-filter: none;
                 border: none;
                 border-radius: 3px;
                 font-size: 14px;
@@ -161,9 +161,9 @@
                 max-width: 49%;
                 padding: 3px 6px;
                 line-height: 1.0;
-                background: rgba(0, 0, 0, 0.6);
+                background: transparent;
                 border: none;
-                backdrop-filter: blur(3px);
+                backdrop-filter: none;
             }
             
             .ui-panel:last-child {
@@ -171,9 +171,9 @@
                 min-width: 120px;
                 max-width: 49%;
                 padding: 3px 6px;
-                background: rgba(0, 0, 0, 0.6);
+                background: transparent;
                 border: none;
-                backdrop-filter: blur(3px);
+                backdrop-filter: none;
             }
             
             .stats div {
@@ -392,6 +392,7 @@
     
     <!-- 基礎設定和工具 -->
     <script src="js/core/platformConfig.js"></script>
+    <script src="js/core/uiAdapter.js"></script>
     <script src="js/core/config.js"></script>
     <script src="js/core/constants.js"></script>
     <script src="js/utils/utils.js"></script>

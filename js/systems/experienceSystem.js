@@ -174,8 +174,19 @@ class ExperienceSystem {
     renderLevelUpEffect(ctx) {
         ctx.save();
         
-        const centerX = ctx.canvas.width / 2;
-        const centerY = ctx.canvas.height / 2;
+        // 使用UI適配系統獲取配置
+        if (!window.uiAdapter) {
+            // 如果UI適配系統未載入，使用原始配置
+            const centerX = ctx.canvas.width / 2;
+            const centerY = ctx.canvas.height / 2;
+            const time = this.levelUpTimer;
+            this.renderLevelUpFallback(ctx, centerX, centerY, time);
+            return;
+        }
+        
+        const levelUpConfig = window.uiAdapter.getModuleConfig('textEffects', ctx.canvas).levelUp;
+        const centerX = levelUpConfig.centerX;
+        const centerY = levelUpConfig.centerY;
         const time = this.levelUpTimer;
         
         // 創建脈衝效果
@@ -218,14 +229,96 @@ class ExperienceSystem {
         ctx.restore();
     }
     
+    // 升級特效fallback方法
+    renderLevelUpFallback(ctx, centerX, centerY, time) {
+        // 創建脈衝效果
+        const pulseScale = 1 + Math.sin(time * 10) * 0.3;
+        const alpha = Math.max(0, 1 - time / 3);
+        
+        // 背景閃光
+        ctx.globalAlpha = alpha * 0.3;
+        ctx.fillStyle = this.getQualityColor();
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        
+        // 升級文字
+        ctx.globalAlpha = alpha;
+        ctx.font = `bold ${48 * pulseScale}px "Courier New", monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = this.getQualityColor();
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = this.getQualityColor();
+        
+        // 故障效果
+        const glitchX = (Math.random() - 0.5) * 10;
+        const glitchY = (Math.random() - 0.5) * 10;
+        
+        ctx.fillText(`LEVEL UP!`, centerX + glitchX, centerY - 50 + glitchY);
+        ctx.fillText(`LV.${this.level}`, centerX + glitchX, centerY + 20 + glitchY);
+        
+        // 數據流效果
+        ctx.font = '12px "Courier New", monospace';
+        for (let i = 0; i < 20; i++) {
+            const angle = (i / 20) * Math.PI * 2 + time * 2;
+            const radius = 100 + Math.sin(time * 3 + i) * 20;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            
+            ctx.globalAlpha = alpha * (0.5 + Math.sin(time * 5 + i) * 0.3);
+            ctx.fillText(['0', '1', '+', '='][i % 4], x, y);
+        }
+        
+        ctx.restore();
+    }
     
     // 渲染經驗值獲得動畫
     renderExpGainAnimations(ctx) {
         ctx.save();
         
-        const baseX = ctx.canvas.width - 100;
-        const baseY = 150;
+        // 使用UI適配系統獲取配置
+        if (!window.uiAdapter) {
+            // 如果UI適配系統未載入，使用原始配置
+            const baseX = ctx.canvas.width - 100;
+            const baseY = 150;
+            this.renderExpGainFallback(ctx, baseX, baseY);
+            return;
+        }
         
+        const expGainConfig = window.uiAdapter.getModuleConfig('textEffects', ctx.canvas).expGain;
+        const baseX = expGainConfig.baseX;
+        const baseY = expGainConfig.baseY;
+        
+        for (const anim of this.expGainAnimations) {
+            ctx.globalAlpha = anim.alpha;
+            ctx.font = `bold ${12 * anim.scale}px "Courier New", monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffff00';
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = '#ffff00';
+            
+            ctx.fillText(
+                `+${anim.amount} EXP`,
+                baseX,
+                baseY + anim.y
+            );
+            
+            // 來源類型顯示
+            if (anim.source.startsWith('kill_')) {
+                ctx.font = `${8 * anim.scale}px "Courier New", monospace`;
+                ctx.fillStyle = '#00ffff';
+                ctx.fillText(
+                    anim.source.replace('kill_', '').toUpperCase(),
+                    baseX,
+                    baseY + anim.y + 15
+                );
+            }
+        }
+        
+        ctx.restore();
+    }
+    
+    // 經驗值獲得動畫fallback方法
+    renderExpGainFallback(ctx, baseX, baseY) {
         for (const anim of this.expGainAnimations) {
             ctx.globalAlpha = anim.alpha;
             ctx.font = `bold ${12 * anim.scale}px "Courier New", monospace`;

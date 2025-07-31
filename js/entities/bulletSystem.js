@@ -1404,6 +1404,14 @@ class BulletSystem {
     renderCyberpunkCombo(ctx) {
         ctx.save();
         
+        // 使用UI適配系統獲取配置
+        if (!window.uiAdapter) {
+            // 如果UI適配系統未載入，使用原始配置
+            this.renderFallbackCombo(ctx);
+            return;
+        }
+        
+        const textConfig = window.uiAdapter.getModuleConfig('textEffects', ctx.canvas).combo;
         const comboAlpha = 1 - (this.comboTimer / this.comboDecayTime) * 0.5;
         const glitchOffset = Math.random() * 2 - 1;
         const time = Date.now() * 0.001;
@@ -1413,13 +1421,13 @@ class BulletSystem {
         ctx.font = '12px "Courier New", monospace';
         ctx.fillStyle = '#00ff88';
         const dataText = '01101011 ' + this.combo.toString(2).padStart(8, '0');
-        ctx.fillText(dataText, this.game.canvas.width / 2, 80);
+        ctx.fillText(dataText, textConfig.centerX, textConfig.centerY - 20);
         
         // 主連擊顯示 - 故障效果
         ctx.globalAlpha = comboAlpha;
         
         // 陰影層
-        ctx.font = 'bold 48px "Courier New", monospace';
+        ctx.font = `bold ${textConfig.fontSize}px "Courier New", monospace`;
         ctx.textAlign = 'center';
         
         // 多層故障效果
@@ -1431,26 +1439,40 @@ class BulletSystem {
             ctx.shadowColor = color;
             
             const offsetX = glitchOffset * (i + 1) * 2;
-            const offsetY = 100 + Math.sin(time * 10 + i) * 5;
+            const offsetY = textConfig.centerY + Math.sin(time * 10 + i) * 5;
             
             ctx.fillText(
                 `[${this.combo}] COMBO!`, 
-                this.game.canvas.width / 2 + offsetX, 
+                textConfig.centerX + offsetX, 
                 offsetY
             );
         });
         
-        // 移除數位框架（虛線框）
-        
         // 連擊等級 - 賽博龐克風格
+        const levelTextY = textConfig.centerY + 40;
         if (this.combo >= 30) {
-            this.renderGlitchText(ctx, 'CYBER OVERDRIVE', this.game.canvas.width / 2, 140, '#ff00ff', comboAlpha);
+            this.renderGlitchText(ctx, 'CYBER OVERDRIVE', textConfig.centerX, levelTextY, '#ff00ff', comboAlpha);
         } else if (this.combo >= 15) {
-            this.renderGlitchText(ctx, 'NEON SURGE', this.game.canvas.width / 2, 140, '#00ffff', comboAlpha);
+            this.renderGlitchText(ctx, 'NEON SURGE', textConfig.centerX, levelTextY, '#00ffff', comboAlpha);
         } else if (this.combo >= 5) {
-            this.renderGlitchText(ctx, 'DIGITAL FLOW', this.game.canvas.width / 2, 140, '#00ff88', comboAlpha);
+            this.renderGlitchText(ctx, 'DIGITAL FLOW', textConfig.centerX, levelTextY, '#00ff88', comboAlpha);
         }
         
+        ctx.restore();
+    }
+    
+    // 備用COMBO渲染（如果UI適配系統未載入）
+    renderFallbackCombo(ctx) {
+        const comboAlpha = 1 - (this.comboTimer / this.comboDecayTime) * 0.5;
+        const glitchOffset = Math.random() * 2 - 1;
+        const time = Date.now() * 0.001;
+        
+        // 使用原始的固定位置
+        ctx.globalAlpha = comboAlpha;
+        ctx.font = 'bold 48px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#00ffff';
+        ctx.fillText(`[${this.combo}] COMBO!`, this.game.canvas.width / 2, 100);
         ctx.restore();
     }
     
