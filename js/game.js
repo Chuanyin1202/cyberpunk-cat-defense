@@ -769,7 +769,8 @@ class CyberpunkCatDefense {
             wave: document.getElementById('wave'),
             score: document.getElementById('score'),
             kills: document.getElementById('kills'),
-            streak: document.getElementById('streak')
+            streak: document.getElementById('streak'),
+            level: document.getElementById('level')
         };
         
         if (elements.lives) {
@@ -792,6 +793,14 @@ class CyberpunkCatDefense {
         if (elements.wave) elements.wave.textContent = this.gameState.wave;
         if (elements.score) elements.score.textContent = this.gameState.score.toLocaleString();
         if (elements.kills) elements.kills.textContent = this.gameState.kills;
+        
+        // 更新等級顯示
+        if (elements.level && this.upgradeSystem && this.upgradeSystem.experienceSystem) {
+            const level = this.upgradeSystem.experienceSystem.level;
+            const qualityColor = this.upgradeSystem.experienceSystem.getQualityColor();
+            elements.level.textContent = level;
+            elements.level.style.color = qualityColor;
+        }
         
         // 顯示彈幕系統的連擊數
         if (elements.streak) {

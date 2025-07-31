@@ -139,84 +139,8 @@ class ExperienceSystem {
         }
     }
     
-    // 渲染極簡經驗值條（底部滿屏寬度）
+    // 渲染系統（移除底部經驗條）
     render(ctx) {
-        // 每幀都渲染，確保經驗條顯示
-        
-        ctx.save();
-        
-        // 檢查是否是手機版本
-        const isMobile = window.innerWidth <= 768;
-        
-        // 使用遊戲配置的邏輯尺寸
-        const logicalHeight = GameConfig.CANVAS.HEIGHT;
-        const logicalWidth = GameConfig.CANVAS.WIDTH;
-        
-        // 極簡底部經驗條
-        const barHeight = 4; // 固定高度
-        const barY = logicalHeight - barHeight; // 使用邏輯高度
-        const barWidth = logicalWidth; // 使用邏輯寬度
-        
-        // 經驗值進度
-        const expProgress = this.experience / this.experienceToNextLevel;
-        const qualityColor = this.getQualityColor();
-        
-        // 背景（更深的黑色背景）
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(0, barY, barWidth, barHeight);
-        
-        // 經驗值條填充（確保可見）
-        if (expProgress > 0) {
-            // 先畫一個稍微亮一點的底層
-            ctx.fillStyle = this.adjustAlpha(qualityColor, 0.3);
-            ctx.fillRect(0, barY, barWidth * expProgress, barHeight);
-            
-            // 再畫主要的填充
-            ctx.fillStyle = qualityColor;
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = qualityColor;
-            ctx.fillRect(0, barY, barWidth * expProgress, barHeight);
-        }
-        
-        // 整個經驗條的邊框（加粗）
-        ctx.strokeStyle = this.adjustAlpha(qualityColor, 0.8);
-        ctx.lineWidth = 2;
-        ctx.strokeRect(0, barY, barWidth, barHeight);
-        
-        // 頂部細邊框
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.beginPath();
-        ctx.moveTo(0, barY);
-        ctx.lineTo(barWidth, barY);
-        ctx.stroke();
-        
-        const fontSize = isMobile ? 20 : 16;
-        const expFontSize = isMobile ? 18 : 14;
-        const textY = barY - 10;
-        
-        // 等級文字（左下角，確保在安全區域內）
-        ctx.font = `bold ${fontSize}px "Courier New", monospace`;
-        ctx.textAlign = 'left';
-        ctx.fillStyle = qualityColor;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(0, 0, 0, 1)';
-        ctx.fillText(`LV.${this.level}`, 15, textY);
-        
-        // 經驗值數字（右下角，確保在安全區域內）
-        ctx.textAlign = 'right';
-        ctx.font = `${expFontSize}px "Courier New", monospace`;
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(0, 0, 0, 1)';
-        ctx.fillText(
-            `${this.experience}/${this.experienceToNextLevel}`, 
-            logicalWidth - 15, textY
-        );
-        
-        // 渲染完成
-        
-        ctx.restore();
-        
         // 渲染升級特效
         if (this.levelUpEffect) {
             this.renderLevelUpEffect(ctx);
@@ -293,6 +217,7 @@ class ExperienceSystem {
         
         ctx.restore();
     }
+    
     
     // 渲染經驗值獲得動畫
     renderExpGainAnimations(ctx) {
