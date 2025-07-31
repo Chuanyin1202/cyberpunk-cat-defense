@@ -592,7 +592,7 @@ class BulletSystem {
         this.game.gameState.mouseY = y;
         
         // 立即觸發一次攻擊
-        this.triggerAttack();
+        this.fireDirectional(Date.now());
     }
     
     // 加強版特殊攻擊 - 能量條觸發

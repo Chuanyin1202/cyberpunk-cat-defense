@@ -23,9 +23,17 @@ class VirtualJoystick {
         this.originalKnobRadius = 18; // 原始搖桿球半徑（稍微縮小）
         this.baseRadius = 45; // 底座半徑
         this.knobRadius = 18; // 搖桿球半徑
-        this.opacity = 0.6; // 透明度
+        this.opacity = this.isMobile ? 0.8 : 0.6; // 手機設備初始顯示（提高透明度）
         this.fadeOutTimer = 0;
-        this.fadeOutDelay = 2000; // 2秒後淡出
+        this.fadeOutDelay = 3000; // 3秒後淡出
+        
+        // 在手機設備上預設顯示位置（使用遊戲畫布座標）
+        if (this.isMobile) {
+            this.centerX = 80; // 左下角位置
+            this.centerY = 480; // 接近畫布底部 (600 * 0.8)
+            this.currentX = this.centerX;
+            this.currentY = this.centerY;
+        }
         
         // 觸控追蹤
         this.touchId = null;
@@ -37,12 +45,17 @@ class VirtualJoystick {
         this.magnitude = 0;
         
         this.setupEventListeners();
+        
+        // VirtualJoystick 初始化完成
+        // console.log('🕹️ VirtualJoystick 初始化完成');
     }
     
     detectMobile() {
+        // 強制啟用虛擬手把以便測試，或檢查真實的手機條件
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                ('ontouchstart' in window) ||
-               (navigator.maxTouchPoints > 0);
+               (navigator.maxTouchPoints > 0) ||
+               (window.innerWidth <= 768); // 小螢幕也啟用
     }
     
     setupEventListeners() {
@@ -103,9 +116,9 @@ class VirtualJoystick {
         const x = (touch.clientX - rect.left) * (GameConfig.CANVAS.WIDTH / rect.width);
         const y = (touch.clientY - rect.top) * (GameConfig.CANVAS.HEIGHT / rect.height);
         
-        // 只在螢幕左下角啟動搖桿（類似ultimate-danmaku）
-        const leftZone = GameConfig.CANVAS.WIDTH * 0.4; // 左40%區域
-        const bottomZone = GameConfig.CANVAS.HEIGHT * 0.6; // 下40%區域
+        // 擴大觸發區域，讓虛擬手把更容易啟動
+        const leftZone = GameConfig.CANVAS.WIDTH * 0.5; // 左50%區域
+        const bottomZone = GameConfig.CANVAS.HEIGHT * 0.5; // 下50%區域
         
         if (x <= leftZone && y >= bottomZone) {
             this.touchId = touch.identifier;
@@ -216,14 +229,23 @@ class VirtualJoystick {
     }
     
     render(ctx) {
-        if (!this.isMobile || this.opacity <= 0 || (!this.isActive && this.fadeOutTimer <= this.fadeOutDelay)) return;
+        if (!this.isMobile) return;
+        
+        // 在手機上始終顯示虛擬手把提示（至少顯示淡淡的底座）
+        if (!this.isActive && this.fadeOutTimer > this.fadeOutDelay && this.opacity <= 0.1) {
+            this.opacity = 0.2; // 保持最低可見度
+        }
+        
+        // 調試信息（僅在需要時啟用）
+        // console.log('🕹️ VirtualJoystick 渲染:', { isActive: this.isActive, opacity: this.opacity });
         
         ctx.save();
+        
         ctx.globalAlpha = this.opacity;
         
-        // 底座
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)';
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+        // 底座（增加透明度讓它更明顯）
+        ctx.strokeStyle = 'rgba(0, 255, 255, 1.0)';  // 完全不透明的邊框
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.4)';    // 更明顯的填充
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(this.centerX, this.centerY, this.baseRadius, 0, Math.PI * 2);

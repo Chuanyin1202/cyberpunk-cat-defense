@@ -243,8 +243,8 @@ class RenderManager {
     renderUI(game) {
         // UI 元素通常由 HTML 處理，這裡可以渲染遊戲內 UI
         
-        // 渲染虛擬搖桿
-        if (game.virtualJoystick && game.virtualJoystick.isActive) {
+        // 渲染虛擬搖桿（手機設備上始終渲染）
+        if (game.virtualJoystick) {
             game.virtualJoystick.render(this.ctx);
         }
     }

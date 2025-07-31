@@ -34,7 +34,7 @@ class CyberpunkCatDefense {
         this.projectileManager = new ProjectileManager(this);
         this.particleManager = new ParticleManager();
         this.performanceMonitor = new PerformanceMonitor();
-        this.virtualJoystick = new VirtualJoystick(this.canvas);
+        // 手機控制系統已在 mobileControls.js 中自動初始化
         this.touchEnhancer = new TouchEnhancer(this);  // 觸控增強系統
         
         // 創建空間網格系統（優化碰撞檢測）
@@ -225,9 +225,7 @@ class CyberpunkCatDefense {
         if (this.upgradeSystem && this.upgradeSystem.cleanup) {
             this.upgradeSystem.cleanup();
         }
-        if (this.virtualJoystick && this.virtualJoystick.cleanup) {
-            this.virtualJoystick.cleanup();
-        }
+        // 手機控制系統清理由 mobileControls 自動處理
         if (this.touchEnhancer && this.touchEnhancer.cleanup) {
             this.touchEnhancer.cleanup();
         }
@@ -536,23 +534,22 @@ class CyberpunkCatDefense {
         this.gameState.mouseY = (event.clientY - rect.top) * scaleY;
     }
     
-    // 處理虛擬搖桿輸入
-    handleVirtualJoystickInput() {
-        if (!this.virtualJoystick.isInUse()) return;
+    // 處理手機瞄準輸入
+    handleMobileControlsInput() {
+        if (!window.mobileControls || !mobileControls.isEnabled) return;
         
-        const input = this.virtualJoystick.getInput();
-        if (input.magnitude > 0) {
-            // 將搖桿輸入轉換為螢幕座標
-            // 以基地為中心，搖桿控制攻擊方向
-            const range = 200; // 攻擊範圍
-            const targetX = this.base.x + input.x * range;
-            const targetY = this.base.y + input.y * range;
+        const attackDir = mobileControls.getAttackDirection();
+        
+        // 處理瞄準輸入 - 設置攻擊方向
+        if (attackDir) {
+            const range = 250; // 瞄準範圍
+            const targetX = this.base.x + attackDir.x * range;
+            const targetY = this.base.y + attackDir.y * range;
             
-            // 限制在畫布範圍內
+            // 確保瞄準點在畫布範圍內
             const clampedX = Math.max(0, Math.min(GameConfig.CANVAS.WIDTH, targetX));
             const clampedY = Math.max(0, Math.min(GameConfig.CANVAS.HEIGHT, targetY));
             
-            // 更新滑鼠座標，讓彈幕系統使用
             this.gameState.mouseX = clampedX;
             this.gameState.mouseY = clampedY;
         }
@@ -666,10 +663,8 @@ class CyberpunkCatDefense {
         this.particleManager.update(deltaTime);
         
         // 更新虛擬搖桿
-        this.virtualJoystick.update(deltaTime);
-        
-        // 處理虛擬搖桿輸入
-        this.handleVirtualJoystickInput();
+        // 處理手機控制輸入
+        this.handleMobileControlsInput();
         
         // 更新觸控增強系統
         if (this.touchEnhancer) {
@@ -744,6 +739,8 @@ class CyberpunkCatDefense {
         if (this.debugSpatialGrid) {
             this.spatialGrid.debugRender(this.ctx);
         }
+        
+        // 手機控制UI由 mobileControls 自動渲染
         
         // 恢復畫布狀態（在所有渲染完成後）
         this.ctx.restore();
@@ -1422,7 +1419,7 @@ class CyberpunkCatDefense {
         this.enemyManager = new EnemyManager(this);
         this.projectileManager = new ProjectileManager(this);
         this.particleManager = new ParticleManager();
-        this.virtualJoystick.reset();
+        // 手機控制系統重置由 mobileControls 自動處理
         this.upgradeSystem.reset();
         
         // 重建空間網格
