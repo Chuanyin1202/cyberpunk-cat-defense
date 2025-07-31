@@ -29,11 +29,15 @@ class UpgradeUI {
         this.bindEvents();
     }
     
-    // 獲取UI配置 - 根據平台調整
+    // 獲取UI配置 - 根據平台和螢幕尺寸調整
     getUIConfig() {
-        const isMobile = window.mobileControls && window.mobileControls.isEnabled;
+        const isTouchDevice = window.mobileControls && window.mobileControls.isEnabled;
+        const screenWidth = this.game.canvas.width;
         
-        if (isMobile) {
+        // 檢查是否為小螢幕（手機）- 寬度小於700px使用垂直布局
+        const isNarrowScreen = screenWidth < 700;
+        
+        if (isTouchDevice && isNarrowScreen) {
             // 手機版：垂直排列，較小卡片
             return {
                 cardWidth: 160,
@@ -45,7 +49,7 @@ class UpgradeUI {
                 maxCardsPerRow: 1    // 每行最多1張卡片
             };
         } else {
-            // PC版：橫向排列，正常大小
+            // PC版/平板版：橫向排列，正常大小
             return {
                 cardWidth: 200,
                 cardHeight: 280,
