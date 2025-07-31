@@ -1561,6 +1561,11 @@ class BulletSystem {
         if (clockAngle < 0) clockAngle += 360;
         
         
+        // 智能追蹤：搜索瞄準方向附近的敵機
+        const isMobile = window.mobileControls && window.mobileControls.isEnabled;
+        const trackingRange = isMobile ? Math.PI / 7.2 : Math.PI / 12; // 手機25°，PC15°
+        const nearbyEnemy = this.findNearbyEnemy(angle, trackingRange);
+        
         // 創建散射攻擊
         for (let i = 0; i < projectileCount; i++) {
             let targetAngle = angle;
@@ -1582,6 +1587,22 @@ class BulletSystem {
                     const offset = (i % (projectileCount / 2) + 0.5) * angleStep;
                     targetAngle = angle + side * offset;
                 }
+            }
+            
+            // 對中心彈或主要彈幕應用追蹤
+            if (nearbyEnemy && (projectileCount === 1 || i === Math.floor(projectileCount / 2))) {
+                const enemyAngle = Math.atan2(nearbyEnemy.y - this.base.y, nearbyEnemy.x - this.base.x);
+                const maxCorrection = isMobile ? Math.PI / 12 : Math.PI / 20; // 手機15°，PC9°
+                const angleDiff = enemyAngle - targetAngle;
+                
+                // 標準化角度差
+                let normalizedDiff = angleDiff;
+                while (normalizedDiff > Math.PI) normalizedDiff -= 2 * Math.PI;
+                while (normalizedDiff < -Math.PI) normalizedDiff += 2 * Math.PI;
+                
+                // 限制修正範圍
+                const correction = Math.max(-maxCorrection, Math.min(maxCorrection, normalizedDiff));
+                targetAngle += correction;
             }
             
             this.createBullet({
@@ -1635,6 +1656,44 @@ class BulletSystem {
                 piercing: this.combo > 10
             });
         }
+    }
+    
+    // 搜索指定方向附近的敵機（智能追蹤輔助）
+    findNearbyEnemy(targetAngle, searchRange) {
+        const activeEnemies = this.game.enemies.filter(enemy => enemy.active);
+        if (activeEnemies.length === 0) return null;
+        
+        let bestEnemy = null;
+        let bestScore = -1;
+        
+        for (const enemy of activeEnemies) {
+            // 計算敵機相對於基地的角度
+            const enemyAngle = Math.atan2(enemy.y - this.base.y, enemy.x - this.base.x);
+            
+            // 計算角度差
+            let angleDiff = Math.abs(enemyAngle - targetAngle);
+            while (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+            
+            // 檢查是否在搜索範圍內
+            if (angleDiff <= searchRange) {
+                // 計算距離
+                const dx = enemy.x - this.base.x;
+                const dy = enemy.y - this.base.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 綜合評分：角度越小、距離越近分數越高
+                const angleScore = (searchRange - angleDiff) / searchRange;
+                const distanceScore = Math.max(0, 1 - distance / 800); // 800px為參考距離
+                const totalScore = angleScore * 0.7 + distanceScore * 0.3;
+                
+                if (totalScore > bestScore) {
+                    bestScore = totalScore;
+                    bestEnemy = enemy;
+                }
+            }
+        }
+        
+        return bestEnemy;
     }
     
     // 螺旋方向性攻擊
