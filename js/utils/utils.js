@@ -429,6 +429,13 @@ class ParticleManager {
     }
 
     createExplosion(x, y, color, count = 4) {
+        // 確保爆炸位置在畫布範圍內
+        const canvas = window.currentGame?.canvas;
+        if (canvas) {
+            x = Math.max(0, Math.min(canvas.width, x));
+            y = Math.max(0, Math.min(canvas.height, y));
+        }
+        
         // 進一步減少粒子數量
         this.addParticles(x, y, count, (i) => ({
             vx: (Math.random() - 0.5) * 120,  // 減慢速度

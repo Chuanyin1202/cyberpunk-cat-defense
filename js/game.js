@@ -782,10 +782,11 @@ class CyberpunkCatDefense {
         if (elements.lives) {
             // 獲取升級後的最大血量
             const maxHealth = this.upgradeSystem ? this.upgradeSystem.getMaxHealth() : GameConfig.GAME.INITIAL_LIVES;
-            elements.lives.textContent = `${this.gameState.lives}/${Math.floor(maxHealth)}`;
+            const currentHealth = Math.max(0, Math.floor(this.gameState.lives)); // 確保是正整數
+            elements.lives.textContent = `${currentHealth}/${Math.floor(maxHealth)}`;
             
             // 根據血量百分比設置顏色
-            const healthPercent = this.gameState.lives / maxHealth;
+            const healthPercent = currentHealth / maxHealth;
             if (healthPercent <= 0.2) {
                 elements.lives.style.color = '#ff0000';
             } else if (healthPercent <= 0.5) {

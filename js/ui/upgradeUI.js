@@ -135,29 +135,42 @@ class UpgradeUI {
         
         // 觸控結束事件
         this.eventHandlers.touchend = (e) => {
-            if (!this.visible || !this.config.enableSwipe || !this.isDragging) return;
+            if (!this.visible) return;
             e.preventDefault();
             
-            const deltaX = this.swipeOffset;
-            const deltaTime = Date.now() - this.dragStartTime;
-            const velocity = Math.abs(deltaX) / deltaTime;
-            
-            // 判斷滑動方向和速度
-            if (Math.abs(deltaX) > 50 || velocity > 0.3) {
-                if (deltaX > 0 && this.currentCardIndex > 0) {
-                    // 向右滑動，顯示上一張
-                    this.currentCardIndex--;
-                } else if (deltaX < 0 && this.currentCardIndex < this.upgradeChoices.length - 1) {
-                    // 向左滑動，顯示下一張
-                    this.currentCardIndex++;
+            if (this.config.enableSwipe && this.isDragging) {
+                // 滑動模式：處理滑動邏輯
+                const deltaX = this.swipeOffset;
+                const deltaTime = Date.now() - this.dragStartTime;
+                const velocity = Math.abs(deltaX) / deltaTime;
+                
+                // 判斷是否為滑動還是點擊
+                const isSwipe = Math.abs(deltaX) > 50 || velocity > 0.3;
+                
+                if (isSwipe) {
+                    // 執行滑動切換
+                    if (deltaX > 0 && this.currentCardIndex > 0) {
+                        // 向右滑動，顯示上一張
+                        this.currentCardIndex--;
+                    } else if (deltaX < 0 && this.currentCardIndex < this.upgradeChoices.length - 1) {
+                        // 向左滑動，顯示下一張
+                        this.currentCardIndex++;
+                    }
+                } else if (Math.abs(deltaX) < 20 && deltaTime < 500) {
+                    // 短距離、短時間：視為點擊，選擇當前卡片
+                    this.selectUpgrade(this.currentCardIndex);
                 }
+                
+                // 重置滑動狀態
+                this.isDragging = false;
+                this.swipeOffset = 0;
+                this.dragStartX = 0;
+                this.dragStartTime = 0;
+            } else if (!this.config.enableSwipe) {
+                // 非滑動模式：直接處理點擊
+                const touch = e.changedTouches[0];
+                this.handleClick(touch);
             }
-            
-            // 重置滑動狀態
-            this.isDragging = false;
-            this.swipeOffset = 0;
-            this.dragStartX = 0;
-            this.dragStartTime = 0;
         };
         this.game.canvas.addEventListener('touchend', this.eventHandlers.touchend);
         
@@ -253,12 +266,6 @@ class UpgradeUI {
     
     // 處理點擊
     handleClick(e) {
-        if (this.config.layout === 'swipeable') {
-            // 滑動模式：點擊任意位置都選擇當前卡片
-            this.selectUpgrade(this.currentCardIndex);
-            return;
-        }
-        
         const rect = this.game.canvas.getBoundingClientRect();
         const scaleX = this.game.canvas.width / rect.width;
         const scaleY = this.game.canvas.height / rect.height;

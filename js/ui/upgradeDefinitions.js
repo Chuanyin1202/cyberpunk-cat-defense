@@ -523,6 +523,19 @@ class UpgradeDefinitions {
         
         console.log(`過濾後可用升級數量: ${filtered.length}`);
         
+        // 如果過濾後沒有可用升級，回退到基礎升級
+        if (filtered.length === 0) {
+            console.warn(`⚠️ 沒有可用升級！回退到基礎升級選項`);
+            const basicUpgrades = [
+                this.ABILITY_UPGRADES.firepower_boost,
+                this.ABILITY_UPGRADES.rapid_fire,
+                this.SURVIVAL_UPGRADES.emergency_repair
+            ].filter(upgrade => upgrade); // 確保升級存在
+            
+            console.log(`回退升級選項: ${basicUpgrades.length} 個`);
+            return basicUpgrades.slice(0, 3); // 最多返回3個
+        }
+        
         // 加權計算
         const weightedOptions = filtered.map(upgrade => {
             let weight = 10; // 基礎權重
@@ -587,6 +600,17 @@ class UpgradeDefinitions {
         }
         
         console.log(`最終選擇的升級數量: ${choices.length}`);
+        
+        // 確保至少有一個選擇
+        if (choices.length === 0) {
+            console.error(`❌ 沒有生成任何升級選擇！強制返回基礎升級`);
+            return [
+                this.ABILITY_UPGRADES.firepower_boost,
+                this.ABILITY_UPGRADES.rapid_fire,
+                this.SURVIVAL_UPGRADES.emergency_repair
+            ].filter(upgrade => upgrade).slice(0, 3);
+        }
+        
         return choices;
     }
     
