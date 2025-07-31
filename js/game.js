@@ -526,8 +526,8 @@ class CyberpunkCatDefense {
     
     // 處理滑鼠移動
     handleMouseMove(event) {
-        // 在手機上禁用滑鼠事件處理，避免與觸控衝突
-        if (window.mobileControls && window.mobileControls.isEnabled) {
+        // 只有當手機搖桿正在使用時才禁用滑鼠，讓PC版保持滑鼠功能
+        if (window.mobileControls && window.mobileControls.isEnabled && window.mobileControls.isAttacking()) {
             return;
         }
         
