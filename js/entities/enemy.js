@@ -61,7 +61,9 @@ class Enemy {
 
         // 移動向基地（眩暈時不移動）
         if (!this.stunned && distance > 0) {
-            const moveSpeed = this.speed * 60 * deltaTime;
+            // 使用平台特定的敵機速度設定
+            const platformConfig = PlatformConfig.getCurrentPlatformConfig();
+            const moveSpeed = this.speed * platformConfig.ENEMY_SPEED_MULTIPLIER * 60 * deltaTime;
             this.x += (dx / distance) * moveSpeed;
             this.y += (dy / distance) * moveSpeed;
         }
@@ -147,10 +149,11 @@ class Enemy {
         // 脈衝效果
         const pulse = 1 + Math.sin(this.pulsePhase) * 0.1;
         
-        // 獲取手機渲染縮放係數（從全域變數或透過 window 獲取）
+        // 使用平台特定的實體大小設定
+        const platformConfig = PlatformConfig.getCurrentPlatformConfig();
         const game = window.currentGame || (this.manager && this.manager.game);
         const renderScale = game?.mobileRenderScale || 1.0;
-        const currentSize = this.size * pulse * renderScale;
+        const currentSize = this.size * pulse * renderScale * platformConfig.ENTITY_SIZE_MULTIPLIER;
 
         // 繪製敵人主體 - 賽博龐克風格
         this.drawCyberpunkEnemy(ctx, currentSize);
