@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>賽博喵咪塔防</title>
+    <title>CyberCats 2087</title>
     <style>
         body {
             margin: 0;
@@ -42,10 +42,13 @@
             background: #000;
             position: relative;
             display: block;
-            max-width: 100%;
-            max-height: 100%;
-            /* 保持寬高比 */
-            aspect-ratio: 4/3;
+            /* 移動版直接滿屏 */
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none;
+            max-height: none;
+            object-fit: cover;
+            object-position: center center;
         }
         
         /* 移動版特定UI */
@@ -151,34 +154,36 @@
         }
     </script>
     
-    <!-- 遊戲核心腳本（與網頁版共用） -->
-    <script src="../js/core/moduleLoader.js"></script>
-    <script src="../js/core/eventBus.js"></script>
-    <script src="../js/core/platformConfig.js"></script>
-    <script src="../js/core/uiAdapter.js"></script>
-    <script src="../js/core/config.js"></script>
-    <script src="../js/core/constants.js"></script>
-    <script src="../js/utils/utils.js"></script>
-    <script src="../js/systems/timerManager.js"></script>
-    <script src="../js/systems/objectPool.js"></script>
-    <script src="../js/systems/spatialGrid.js"></script>
-    <script src="../js/utils/performanceStats.js"></script>
-    <script src="../js/core/gameStateManager.js"></script>
-    <script src="../js/systems/inputManager.js"></script>
-    <script src="../js/managers/renderManager.js"></script>
-    <script src="../js/systems/mobileControls.js"></script>
-    <script src="../js/systems/touchEnhancer.js"></script>
-    <script src="../js/rendering/baseRenderer.js"></script>
-    <script src="../js/utils/vectorIcons.js"></script>
-    <script src="../js/entities/bulletSystem.js"></script>
-    <script src="../js/entities/base.js"></script>
-    <script src="../js/entities/enemy.js"></script>
-    <script src="../js/entities/projectile.js"></script>
-    <script src="../js/systems/experienceSystem.js"></script>
-    <script src="../js/ui/upgradeDefinitions.js"></script>
-    <script src="../js/ui/upgradeUI.js"></script>
-    <script src="../js/systems/upgradeSystem.js"></script>
-    <script src="../js/game.js"></script>
+    <!-- 遊戲核心腳本 -->
+    <script src="js/mobile-performance-config.js"></script>
+    <script src="js/core/moduleLoader.js"></script>
+    <script src="js/core/eventBus.js"></script>
+    <script src="js/core/platformConfig.js"></script>
+    <script src="js/core/uiAdapter.js"></script>
+    <script src="js/core/config.js"></script>
+    <script src="js/core/constants.js"></script>
+    <script src="js/utils/utils.js"></script>
+    <script src="js/systems/timerManager.js"></script>
+    <script src="js/systems/objectPool.js"></script>
+    <script src="js/systems/spatialGrid.js"></script>
+    <script src="js/utils/performanceStats.js"></script>
+    <script src="js/core/gameStateManager.js"></script>
+    <script src="js/systems/inputManager.js"></script>
+    <script src="js/managers/renderManager.js"></script>
+    <script src="js/systems/mobileControls.js"></script>
+    <script src="js/touchEnhancer.js"></script>
+    <script src="js/rendering/baseRenderer.js"></script>
+    <script src="js/utils/vectorIcons.js"></script>
+    <script src="js/entities/bulletSystem.js"></script>
+    <script src="js/entities/base.js"></script>
+    <script src="js/entities/enemy.js"></script>
+    <script src="js/entities/projectile.js"></script>
+    <script src="js/systems/experienceSystem.js"></script>
+    <script src="js/ui/upgradeDefinitions.js"></script>
+    <script src="js/ui/upgradeUI.js"></script>
+    <script src="js/systems/upgradeSystem.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/performance-patch.js"></script>
     
     <!-- 移動版初始化 -->
     <script>

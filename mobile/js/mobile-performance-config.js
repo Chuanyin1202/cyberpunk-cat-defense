@@ -1,0 +1,1 @@
+../../src/platform/mobile/config/mobile-performance-config.js

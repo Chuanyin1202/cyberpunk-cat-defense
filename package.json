@@ -5,9 +5,18 @@
   "main": "index.html",
   "scripts": {
     "serve": "python3 server-utils/server.py",
+    "serve:mobile": "cd mobile && python3 -m http.server 8080",
     "android": "npx cap run android",
     "android:build": "npx cap build android",
+    "android:release": "cd android && ./gradlew assembleRelease",
+    "ios:build": "npx cap build ios",
     "sync": "npx cap sync",
+    "sync:android": "npx cap sync android",
+    "sync:ios": "npx cap sync ios",
+    "build:mobile-web": "npm run sync && cp -r mobile/* builds/mobile-web/",
+    "build:desktop-web": "cp index.html builds/desktop-web/ && cp -r js shared builds/desktop-web/",
+    "build:all": "npm run sync && npm run android:release",
+    "clean": "rm -rf android/app/build ios/App/build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

@@ -1,7 +1,11 @@
 {
-  "appId": "com.cyberpunkcatdefense.game",
-  "appName": "賽博喵咪塔防",
-  "webDir": ".",
+  "appId": "com.planbwork.cybercats",
+  "appName": "CyberCats 2087",
+  "webDir": "mobile",
+  "includePlugins": [
+    "@capacitor/splash-screen",
+    "@capacitor/status-bar"
+  ],
   "bundledWebRuntime": false,
   "plugins": {
     "SplashScreen": {
@@ -23,10 +27,11 @@
   "android": {
     "allowMixedContent": true,
     "captureInput": false,
-    "webContentsDebuggingEnabled": true
+    "webContentsDebuggingEnabled": false,
+    "hardwareAccelerated": true,
+    "useLegacyBridge": false
   },
   "server": {
-    "url": "http://localhost:8000",
-    "cleartext": true
+    "androidScheme": "https"
   }
 }

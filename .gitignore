@@ -67,11 +67,24 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Capacitor / Android
-android/
+# Capacitor
 ios/
 .capacitor/
-capacitor-cordova-android-plugins/
+
+# Android - 排除建構輸出但保留源碼
+android/app/build/
+android/build/
+android/*/build/
+android/local.properties
+android/.gradle/
+android/gradle.properties.local
+
+# Android 簽名 Keys - 重要安全文件
+android/app/keys/release.keystore
+android/app/keys/*.keystore
+!android/app/keys/debug.keystore
+android/app/google-services.json
+android/app/src/main/assets/capacitor.config.json
 
 # 建構輸出 (如果未來要加入建構流程)
 dist/

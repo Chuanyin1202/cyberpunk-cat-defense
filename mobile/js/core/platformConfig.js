@@ -1,0 +1,1 @@
+../../../src/core/platformConfig.js
