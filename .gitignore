@@ -54,7 +54,7 @@ coverage-report.*
 performance-report.*
 analysis-report.*
 
-# Node.js (如果未來要加入建構工具)
+# Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -66,6 +66,12 @@ yarn-error.log*
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# Capacitor / Android
+android/
+ios/
+.capacitor/
+capacitor-cordova-android-plugins/
 
 # 建構輸出 (如果未來要加入建構流程)
 dist/
