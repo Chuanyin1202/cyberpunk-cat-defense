@@ -110,9 +110,8 @@ class UpgradeUI {
                 this.isDragging = true;
                 this.dragStartX = touch.clientX;
                 this.dragStartTime = Date.now();
-            } else {
-                this.handleClick(touch);
             }
+            // 注意：在 touchstart 不直接處理點擊，統一在 touchend 處理
         };
         this.game.canvas.addEventListener('touchstart', this.eventHandlers.touchstart);
         
@@ -160,9 +159,16 @@ class UpgradeUI {
                 this.dragStartX = 0;
                 this.dragStartTime = 0;
             } else if (!this.config.enableSwipe) {
-                // 非滑動模式：直接處理點擊
-                const touch = e.changedTouches[0];
-                this.handleClick(touch);
+                // 非滑動模式：處理點擊
+                if (e.changedTouches && e.changedTouches.length > 0) {
+                    const touch = e.changedTouches[0];
+                    // 創建一個類似鼠標事件的對象，包含 clientX 和 clientY
+                    const touchEvent = {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    };
+                    this.handleClick(touchEvent);
+                }
             }
         };
         this.game.canvas.addEventListener('touchend', this.eventHandlers.touchend);
@@ -266,7 +272,13 @@ class UpgradeUI {
         const clickX = (e.clientX - rect.left) * scaleX;
         const clickY = (e.clientY - rect.top) * scaleY;
         
+        // 調試日誌
+        console.log(`🎯 UpgradeUI 點擊: 原始(${e.clientX}, ${e.clientY}) -> Canvas(${clickX.toFixed(1)}, ${clickY.toFixed(1)})`);
+        console.log(`📐 Canvas尺寸: ${this.game.canvas.width}x${this.game.canvas.height}, 實際尺寸: ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}`);
+        console.log(`🎮 配置: layout=${this.config.layout}, platform=${this.config.platform}`);
+        
         const cardIndex = this.getCardIndexAt(clickX, clickY);
+        console.log(`🃏 點擊到的卡片索引: ${cardIndex}`);
         
         if (cardIndex >= 0) {
             this.selectUpgrade(cardIndex);
@@ -294,6 +306,12 @@ class UpgradeUI {
     // 獲取指定位置的卡片索引 - 支援多種布局
     getCardIndexAt(x, y) {
         const positions = this.getCardPositions();
+        
+        // 調試：顯示所有卡片位置
+        console.log('🎴 卡片位置:');
+        positions.forEach((pos, i) => {
+            console.log(`  卡片${i}: x=${pos.x.toFixed(1)}-${(pos.x + this.config.cardWidth).toFixed(1)}, y=${pos.y.toFixed(1)}-${(pos.y + this.config.cardHeight).toFixed(1)}`);
+        });
         
         for (let i = 0; i < Math.min(3, this.upgradeChoices.length); i++) {
             const pos = positions[i];
