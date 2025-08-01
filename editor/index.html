@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>賽博龐克貓咪塔防 - 內容編輯器</title>
+    <link rel="stylesheet" href="css/editor.css">
+    <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+    <div id="editor-container" class="editor-container">
+        <!-- 頂部導航 -->
+        <header class="editor-header">
+            <div class="header-brand">
+                <h1>🐱 賽博龐克貓咪塔防</h1>
+                <span class="subtitle">內容編輯器 v1.0</span>
+            </div>
+            
+            <nav class="module-tabs">
+                <button class="tab-button active" data-module="enemies">
+                    <span class="tab-icon">👾</span>
+                    <span class="tab-text">敵機設計</span>
+                </button>
+                <button class="tab-button" data-module="weapons">
+                    <span class="tab-icon">🔫</span>
+                    <span class="tab-text">武器系統</span>
+                </button>
+                <button class="tab-button" data-module="skills">
+                    <span class="tab-icon">⚡</span>
+                    <span class="tab-text">技能開發</span>
+                </button>
+                <button class="tab-button" data-module="effects">
+                    <span class="tab-icon">✨</span>
+                    <span class="tab-text">特效渲染</span>
+                </button>
+            </nav>
+            
+            <div class="header-actions">
+                <button class="action-button" id="reload-config">
+                    <span class="button-icon">🔄</span>
+                    <span class="button-text">重載配置</span>
+                </button>
+                <button class="action-button" id="save-config">
+                    <span class="button-icon">💾</span>
+                    <span class="button-text">保存配置</span>
+                </button>
+                <button class="action-button" id="test-game">
+                    <span class="button-icon">🎮</span>
+                    <span class="button-text">測試遊戲</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 主要內容區域 -->
+        <main class="editor-main">
+            <!-- 左側資源瀏覽器 -->
+            <aside class="asset-browser">
+                <div class="browser-header">
+                    <h3>資源瀏覽器</h3>
+                    <button class="create-button" id="create-new">
+                        <span class="button-icon">➕</span>
+                        <span class="button-text">新建</span>
+                    </button>
+                </div>
+                
+                <div class="browser-content">
+                    <div class="asset-list" id="asset-list">
+                        <!-- 動態生成資源列表 -->
+                    </div>
+                </div>
+                
+                <div class="browser-footer">
+                    <button class="utility-button" id="import-config">導入配置</button>
+                    <button class="utility-button" id="export-config">導出配置</button>
+                </div>
+            </aside>
+
+            <!-- 中央工作區域 -->
+            <section class="editor-workspace">
+                <div class="workspace-header">
+                    <div class="workspace-title">
+                        <h2 id="workspace-title">敵機設計工作區</h2>
+                        <span class="workspace-status" id="workspace-status">就緒</span>
+                    </div>
+                    
+                    <div class="workspace-tools">
+                        <button class="tool-button" id="preview-toggle">
+                            <span class="button-icon">👁️</span>
+                            <span class="button-text">預覽</span>
+                        </button>
+                        <button class="tool-button" id="grid-toggle">
+                            <span class="button-icon">⊞</span>
+                            <span class="button-text">網格</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="workspace-content">
+                    <!-- 預覽畫布 -->
+                    <canvas id="preview-canvas" width="800" height="600"></canvas>
+                    
+                    <!-- 工作區覆蓋層 -->
+                    <div class="workspace-overlay" id="workspace-overlay">
+                        <div class="welcome-message">
+                            <h3>歡迎使用內容編輯器</h3>
+                            <p>選擇左側資源開始編輯，或點擊「新建」創建新內容</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右側屬性面板 -->
+            <aside class="property-panel">
+                <div class="panel-header">
+                    <h3 id="property-title">屬性面板</h3>
+                    <button class="panel-toggle" id="panel-toggle">
+                        <span class="button-icon">⚙️</span>
+                    </button>
+                </div>
+                
+                <div class="panel-content" id="property-content">
+                    <div class="property-placeholder">
+                        <p>選擇資源以顯示屬性</p>
+                    </div>
+                </div>
+                
+                <div class="panel-footer">
+                    <button class="apply-button" id="apply-changes">應用更改</button>
+                    <button class="reset-button" id="reset-changes">重置</button>
+                </div>
+            </aside>
+        </main>
+
+        <!-- 狀態欄 -->
+        <footer class="editor-footer">
+            <div class="status-info">
+                <span class="status-item">
+                    <span class="status-label">模式:</span>
+                    <span class="status-value" id="current-mode">敵機編輯</span>
+                </span>
+                <span class="status-item">
+                    <span class="status-label">已選:</span>
+                    <span class="status-value" id="selected-item">無</span>
+                </span>
+                <span class="status-item">
+                    <span class="status-label">修改:</span>
+                    <span class="status-value" id="modification-status">未修改</span>
+                </span>
+            </div>
+            
+            <div class="version-info">
+                <span>賽博龐克貓咪塔防編輯器 v1.0.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 模態對話框 -->
+    <div class="modal-backdrop" id="modal-backdrop" style="display: none;">
+        <div class="modal-dialog" id="modal-dialog">
+            <div class="modal-header">
+                <h3 id="modal-title">對話框標題</h3>
+                <button class="modal-close" id="modal-close">✖</button>
+            </div>
+            <div class="modal-content" id="modal-content">
+                <!-- 動態內容 -->
+            </div>
+            <div class="modal-footer">
+                <button class="modal-button secondary" id="modal-cancel">取消</button>
+                <button class="modal-button primary" id="modal-confirm">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 載入編輯器腳本 -->
+    <script src="js/core/dataManager.js"></script>
+    <script src="js/core/previewRenderer.js"></script>
+    <script src="js/ui/propertyPanel.js"></script>
+    <script src="js/ui/assetBrowser.js"></script>
+    <script src="js/modules/enemyEditor.js"></script>
+    <script src="js/core/editorCore.js"></script>
+    
+    <!-- 啟動編輯器 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.gameEditor = new GameContentEditor();
+            window.gameEditor.initialize();
+        });
+    </script>
+</body>
+</html>

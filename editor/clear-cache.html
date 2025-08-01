@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清除編輯器快取</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 50px;
+            text-align: center;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 10px;
+            font-family: monospace;
+        }
+        button:hover {
+            background: #00cc00;
+        }
+        .message {
+            margin: 20px;
+            padding: 20px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>🧹 清除編輯器快取</h1>
+    <div class="message">
+        <p>編輯器會將配置保存在瀏覽器的本地存儲中。</p>
+        <p>如果您想要載入最新的配置文件，請點擊下方按鈕清除快取。</p>
+    </div>
+    
+    <button onclick="clearCache()">清除快取並重新載入</button>
+    <button onclick="window.location.href='index.html'">返回編輯器</button>
+    
+    <div id="result"></div>
+
+    <script>
+        function clearCache() {
+            const result = document.getElementById('result');
+            
+            try {
+                // 清除所有編輯器相關的 localStorage
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.includes('editor_config_')) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                    console.log(`已清除: ${key}`);
+                });
+                
+                result.innerHTML = `
+                    <div class="message" style="border-color: #00ff00;">
+                        <h3>✅ 快取已清除！</h3>
+                        <p>已清除 ${keysToRemove.length} 個快取項目</p>
+                        <p>正在重新導向到編輯器...</p>
+                    </div>
+                `;
+                
+                // 3秒後跳轉到編輯器
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 3000);
+                
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="message" style="border-color: #ff0000;">
+                        <h3>❌ 清除失敗</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 顯示當前快取狀態
+        window.onload = function() {
+            let cacheCount = 0;
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.includes('editor_config_')) {
+                    cacheCount++;
+                }
+            }
+            
+            if (cacheCount > 0) {
+                document.getElementById('result').innerHTML = `
+                    <div class="message" style="border-color: #ffff00;">
+                        <p>📦 找到 ${cacheCount} 個快取配置</p>
+                    </div>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

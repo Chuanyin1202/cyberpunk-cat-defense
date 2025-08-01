@@ -1,6 +1,9 @@
 #!/bin/bash
 # 停止背景服務器腳本
 
+# 切換到腳本目錄
+cd "$(dirname "$0")"
+
 if [ -f server.pid ]; then
     PID=$(cat server.pid)
     if ps -p $PID > /dev/null; then

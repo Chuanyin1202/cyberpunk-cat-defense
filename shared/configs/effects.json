@@ -1,0 +1,99 @@
+{
+  "version": "1.0.0",
+  "lastModified": "2024-01-31T12:00:00.000Z",
+  "editor": "cyberpunk-cat-defense-editor",
+  "effects": {
+    "energy_burst": {
+      "id": "energy_burst",
+      "name": "能量爆發",
+      "type": "explosion",
+      "description": "能量武器擊中目標時的爆發效果",
+      "visual": {
+        "particleCount": 20,
+        "particleSize": 3,
+        "particleSpeed": 200,
+        "particleLifetime": 500,
+        "colors": ["#00ffff", "#00ccff", "#0099ff"],
+        "blendMode": "add",
+        "gravity": 0
+      },
+      "audio": {
+        "soundEffect": "energy_impact",
+        "volume": 0.6
+      }
+    },
+    "plasma_explosion": {
+      "id": "plasma_explosion",
+      "name": "等離子爆炸",
+      "type": "explosion",
+      "description": "等離子武器的濺射爆炸效果",
+      "visual": {
+        "particleCount": 30,
+        "particleSize": 5,
+        "particleSpeed": 150,
+        "particleLifetime": 800,
+        "colors": ["#ff6600", "#ff9900", "#ffcc00"],
+        "blendMode": "add",
+        "gravity": 50,
+        "splashRadius": 50
+      },
+      "audio": {
+        "soundEffect": "plasma_blast",
+        "volume": 0.8
+      }
+    },
+    "quantum_distortion": {
+      "id": "quantum_distortion",
+      "name": "量子扭曲",
+      "type": "continuous",
+      "description": "量子武器的持續扭曲效果",
+      "visual": {
+        "distortionRadius": 30,
+        "distortionStrength": 0.5,
+        "rippleSpeed": 2,
+        "colors": ["#9900ff", "#cc00ff", "#ff00ff"],
+        "duration": 3000
+      },
+      "audio": {
+        "soundEffect": "quantum_hum",
+        "volume": 0.4,
+        "loop": true
+      }
+    },
+    "kinetic_shockwave": {
+      "id": "kinetic_shockwave",
+      "name": "動能衝擊波",
+      "type": "shockwave",
+      "description": "軌道炮的衝擊波效果",
+      "visual": {
+        "waveRadius": 100,
+        "waveSpeed": 300,
+        "waveThickness": 5,
+        "waveColor": "#ffffff",
+        "waveOpacity": 0.8,
+        "waveDuration": 500
+      },
+      "audio": {
+        "soundEffect": "railgun_impact",
+        "volume": 1.0
+      }
+    },
+    "nano_disintegration": {
+      "id": "nano_disintegration",
+      "name": "奈米分解",
+      "type": "dissolve",
+      "description": "奈米武器的分解效果",
+      "visual": {
+        "dissolveSpeed": 0.5,
+        "pixelSize": 2,
+        "colors": ["#ffff00", "#cccc00", "#999900"],
+        "direction": "outward",
+        "duration": 1000
+      },
+      "audio": {
+        "soundEffect": "nano_dissolve",
+        "volume": 0.5
+      }
+    }
+  }
+}

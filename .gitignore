@@ -1,31 +1,113 @@
 # 作業系統檔案
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # 編輯器檔案
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 *.swp
 *.swo
 *~
+.project
+.settings/
 
 # 暫存檔案
 *.tmp
 *.temp
+*.cache
+*.bak
+*.backup
+*.old
+~*
+
+# 日誌檔案
 *.log
+logs/
+server.log
+server_output.log
+
+# 伺服器相關
+server.pid
+*.pyc
+__pycache__/
+.Python
+
+# 測試檔案
+memory-leak-test.html
+editor/test.html
+tests/
+*-test.html
+*.test.html
+test-*.html
+
+# 本地編輯器配置快取
+editor/cache/
+editor/temp/
+localStorage.json
+
+# 生成的報告（只忽略自動生成的）
+test-report.*
+coverage-report.*
+performance-report.*
+analysis-report.*
 
 # Node.js (如果未來要加入建構工具)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.npm
+.yarn
+
+# 套件管理器
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # 建構輸出 (如果未來要加入建構流程)
 dist/
 build/
 out/
+.cache/
 
-# 其他
+# 環境設定
 .env
 .env.local
-*.bak
+.env.*.local
+config.local.js
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# 其他開發工具
+.eslintcache
+.stylelintcache

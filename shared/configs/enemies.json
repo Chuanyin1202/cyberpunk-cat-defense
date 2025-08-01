@@ -1,0 +1,386 @@
+{
+  "version": "2.0.0",
+  "lastModified": "2024-01-31T12:00:00.000Z",
+  "editor": "cyberpunk-cat-defense-editor",
+  "theme": "賽博龐克貓咪統治世界",
+  "enemies": {
+    "neon_paw_assassin": {
+      "id": "neon_paw_assassin",
+      "name": "霓虹爪刺客",
+      "faction": "霓虹貓幫",
+      "type": "assassin",
+      "description": "裝備霓虹光爪的暗殺貓，在夜色中無聲獵殺",
+      "stats": {
+        "health": 120,
+        "speed": 4.5,
+        "damage": 45,
+        "reward": 60,
+        "stealthDuration": 3000
+      },
+      "visual": {
+        "size": 16,
+        "color": "#ff00ff",
+        "glowColor": "#ff66ff",
+        "shape": "cyber_cat",
+        "features": {
+          "neonClaws": true,
+          "glowingEyes": "pink",
+          "cyberTail": "blade",
+          "hologramEars": true
+        },
+        "animations": ["prowl", "pounce", "shadow_dash", "claw_strike", "purr_death"]
+      },
+      "behavior": {
+        "movementType": "feline_stalk",
+        "specialAbilities": ["neon_claw_slash", "shadow_pounce", "nine_lives"],
+        "ai": "predator",
+        "catTraits": {
+          "curiosityLevel": 0.7,
+          "napTime": false,
+          "toyDistraction": 0.2
+        }
+      }
+    },
+    "mecha_chonker": {
+      "id": "mecha_chonker",
+      "name": "機甲肥貓",
+      "faction": "機械貓教團",
+      "type": "heavy",
+      "description": "超重型戰鬥機甲貓，慢但是真的很強",
+      "stats": {
+        "health": 800,
+        "speed": 0.8,
+        "damage": 80,
+        "reward": 100,
+        "armor": 70
+      },
+      "visual": {
+        "size": 28,
+        "color": "#c0c0c0",
+        "glowColor": "#00ffff",
+        "shape": "chonky_mech_cat",
+        "features": {
+          "metalBelly": true,
+          "laserEyes": "blue",
+          "rocketPaws": 4,
+          "armorPlating": "heavy"
+        },
+        "animations": ["heavy_waddle", "belly_slam", "laser_meow", "rocket_jump", "system_crash"]
+      },
+      "behavior": {
+        "movementType": "heavy_plod",
+        "specialAbilities": ["belly_bounce", "laser_hairball", "emergency_catnip"],
+        "ai": "fortress_cat",
+        "catTraits": {
+          "hungryLevel": 0.9,
+          "lazyMode": true,
+          "treatWeakness": 0.8
+        }
+      }
+    },
+    "data_ghost_kitten": {
+      "id": "data_ghost_kitten",
+      "name": "數據幽靈貓",
+      "faction": "數位貓駭客聯盟",
+      "type": "hacker",
+      "description": "能在數位世界自由穿梭的幽靈小貓",
+      "stats": {
+        "health": 80,
+        "speed": 3.8,
+        "damage": 25,
+        "reward": 45,
+        "hackRadius": 250
+      },
+      "visual": {
+        "size": 12,
+        "color": "#00ff00",
+        "glowColor": "#00ff00",
+        "shape": "pixel_kitten",
+        "features": {
+          "pixelatedFur": true,
+          "matrixEyes": true,
+          "glitchTail": true,
+          "digitalWhiskers": true
+        },
+        "opacity": 0.6,
+        "animations": ["phase_walk", "code_scratch", "firewall_climb", "buffer_overflow", "kernel_panic"]
+      },
+      "behavior": {
+        "movementType": "glitch_teleport",
+        "specialAbilities": ["ddos_purr", "trojan_hairball", "root_access_meow"],
+        "ai": "hacker_cat",
+        "catTraits": {
+          "curiosityLevel": 1.0,
+          "mischievous": true,
+          "cableChewing": 0.9
+        }
+      }
+    },
+    "quantum_schrodinger": {
+      "id": "quantum_schrodinger",
+      "name": "量子薛丁格貓",
+      "faction": "量子貓科學院",
+      "type": "exotic",
+      "description": "同時存在又不存在的量子貓",
+      "stats": {
+        "health": 150,
+        "speed": 3.5,
+        "damage": 40,
+        "reward": 80,
+        "quantumState": "superposition"
+      },
+      "visual": {
+        "size": 15,
+        "color": "#9900ff",
+        "glowColor": "#cc66ff",
+        "shape": "quantum_cat",
+        "features": {
+          "probabilityCloud": true,
+          "boxAccessory": true,
+          "waveFunction": "visible",
+          "deadAliveOverlay": true
+        },
+        "opacity": 0.7,
+        "animations": ["exist", "not_exist", "observe", "collapse", "quantum_meow"]
+      },
+      "behavior": {
+        "movementType": "quantum_tunnel",
+        "specialAbilities": ["superposition", "quantum_entanglement", "observer_effect"],
+        "ai": "probability_based",
+        "catTraits": {
+          "boxObsession": 1.0,
+          "existenceCrisis": true,
+          "scientificCuriosity": 0.95
+        }
+      }
+    },
+    "cyber_yarn_swarm": {
+      "id": "cyber_yarn_swarm",
+      "name": "賽博毛線球群",
+      "faction": "數位貓駭客聯盟",
+      "type": "swarm",
+      "description": "被AI控制的毛線球群，會纏住所有東西",
+      "stats": {
+        "health": 20,
+        "speed": 6.0,
+        "damage": 8,
+        "reward": 5,
+        "swarmSize": 20
+      },
+      "visual": {
+        "size": 5,
+        "color": "#ff6600",
+        "glowColor": "#ffaa00",
+        "shape": "yarn_ball",
+        "features": {
+          "neonStrings": true,
+          "tangleEffect": true,
+          "rollingAnimation": true,
+          "sparkTrail": true
+        },
+        "animations": ["roll", "tangle", "unravel", "bounce", "explode_into_string"]
+      },
+      "behavior": {
+        "movementType": "chaotic_roll",
+        "specialAbilities": ["tangle_trap", "string_theory", "yarn_explosion"],
+        "ai": "swarm_intelligence",
+        "catTraits": {
+          "playfulness": 1.0,
+          "distractibility": 0.9,
+          "groupBehavior": true
+        }
+      }
+    },
+    "void_sphinx": {
+      "id": "void_sphinx",
+      "name": "虛空獅身貓",
+      "faction": "虛擬貓黑手黨",
+      "type": "boss",
+      "description": "來自數位深淵的古老貓神",
+      "stats": {
+        "health": 1200,
+        "speed": 2.0,
+        "damage": 100,
+        "reward": 250,
+        "phases": 3
+      },
+      "visual": {
+        "size": 35,
+        "color": "#330066",
+        "glowColor": "#9933ff",
+        "shape": "sphinx_cat",
+        "features": {
+          "ancientRunes": true,
+          "cosmicFur": true,
+          "thirdEye": true,
+          "etherealWings": true,
+          "pyramidCrown": true
+        },
+        "animations": ["ancient_prowl", "riddle_pose", "cosmic_roar", "dimension_slash", "nine_lives_regeneration"]
+      },
+      "behavior": {
+        "movementType": "majestic_stride",
+        "specialAbilities": ["riddle_of_existence", "cosmic_hairball", "dimension_portal", "ancient_curse"],
+        "ai": "boss_intelligence",
+        "phases": {
+          "phase1": "riddler",
+          "phase2": "berserker",
+          "phase3": "ascended"
+        },
+        "catTraits": {
+          "wisdom": 1.0,
+          "pride": 0.95,
+          "napSchedule": "between_phases"
+        }
+      }
+    },
+    "laser_pointer_phantom": {
+      "id": "laser_pointer_phantom",
+      "name": "雷射點幻影",
+      "faction": "霓虹貓幫",
+      "type": "illusion",
+      "description": "傳說中永遠追不到的紅點",
+      "stats": {
+        "health": 60,
+        "speed": 8.0,
+        "damage": 15,
+        "reward": 40,
+        "distractionPower": 100
+      },
+      "visual": {
+        "size": 8,
+        "color": "#ff0000",
+        "glowColor": "#ff3333",
+        "shape": "red_dot",
+        "features": {
+          "hypnoticPulse": true,
+          "afterimage": true,
+          "impossibleMovement": true
+        },
+        "animations": ["dart", "zigzag", "wall_climb", "disappear", "multiply"]
+      },
+      "behavior": {
+        "movementType": "erratic_dot",
+        "specialAbilities": ["mass_distraction", "wall_projection", "infinite_chase"],
+        "ai": "trickster",
+        "catTraits": {
+          "irresistibility": 1.0,
+          "frustrationInducer": true,
+          "neverCatchable": true
+        }
+      }
+    },
+    "catnip_berserker": {
+      "id": "catnip_berserker",
+      "name": "貓薄荷狂戰士",
+      "faction": "機械貓教團",
+      "type": "disruptor",
+      "description": "吸了太多賽博貓薄荷的瘋狂戰士",
+      "stats": {
+        "health": 200,
+        "speed": 5.0,
+        "damage": 60,
+        "reward": 70,
+        "catnipLevel": "overdose"
+      },
+      "visual": {
+        "size": 18,
+        "color": "#00ff00",
+        "glowColor": "#66ff66",
+        "shape": "crazed_cat",
+        "features": {
+          "dilatedPupils": true,
+          "electricFur": true,
+          "catnipAura": true,
+          "twitchyTail": true
+        },
+        "animations": ["wild_sprint", "crazy_spin", "wall_bounce", "berserk_swipe", "catnip_crash"]
+      },
+      "behavior": {
+        "movementType": "chaotic_sprint",
+        "specialAbilities": ["catnip_rage", "wall_running", "tornado_spin"],
+        "ai": "berserk",
+        "catTraits": {
+          "highLevel": 1.0,
+          "unpredictable": true,
+          "crashChance": 0.3
+        }
+      }
+    },
+    "hologram_nyangel": {
+      "id": "hologram_nyangel",
+      "name": "全息喵天使",
+      "faction": "量子貓科學院",
+      "type": "stealth",
+      "description": "會治癒其他貓的神聖投影",
+      "stats": {
+        "health": 100,
+        "speed": 3.0,
+        "damage": 10,
+        "reward": 50,
+        "healPower": 30
+      },
+      "visual": {
+        "size": 14,
+        "color": "#ffffff",
+        "glowColor": "#ffffcc",
+        "shape": "angel_cat",
+        "features": {
+          "holoWings": true,
+          "halo": true,
+          "sparkles": true,
+          "transparentBody": true
+        },
+        "opacity": 0.7,
+        "animations": ["float", "wing_flap", "heal_beam", "resurrection", "ascend"]
+      },
+      "behavior": {
+        "movementType": "graceful_float",
+        "specialAbilities": ["healing_purr", "resurrection_meow", "holy_hairball"],
+        "ai": "healer",
+        "catTraits": {
+          "compassion": 0.9,
+          "gentleness": true,
+          "ninelivesGiver": true
+        }
+      }
+    },
+    "crypto_kitty_miner": {
+      "id": "crypto_kitty_miner",
+      "name": "加密貓礦工",
+      "faction": "虛擬貓黑手黨",
+      "type": "virus",
+      "description": "挖掘數位貓幣的區塊鏈貓",
+      "stats": {
+        "health": 150,
+        "speed": 2.5,
+        "damage": 30,
+        "reward": 100,
+        "miningRate": 5
+      },
+      "visual": {
+        "size": 16,
+        "color": "#ffd700",
+        "glowColor": "#ffed4e",
+        "shape": "mining_cat",
+        "features": {
+          "miningHelmet": true,
+          "pickaxePaws": true,
+          "bitcoinCollar": true,
+          "blockchainFur": true
+        },
+        "animations": ["dig", "mine_bitcoin", "wallet_check", "market_crash", "hodl"]
+      },
+      "behavior": {
+        "movementType": "steady_mining",
+        "specialAbilities": ["crypto_claw", "blockchain_barrier", "market_manipulation"],
+        "ai": "economist",
+        "catTraits": {
+          "greed": 0.8,
+          "patience": 0.9,
+          "volatility": "high"
+        }
+      }
+    }
+  }
+}

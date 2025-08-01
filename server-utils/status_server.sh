@@ -4,6 +4,9 @@
 echo "=== Cyberpunk Cat Defense 服務器狀態 ==="
 echo ""
 
+# 切換到腳本目錄
+cd "$(dirname "$0")"
+
 # 檢查 PID 文件
 if [ -f server.pid ]; then
     PID=$(cat server.pid)

@@ -13,6 +13,7 @@ fi
 
 # 啟動服務器在背景
 echo "正在啟動 Cyberpunk Cat Defense 服務器..."
+cd "$(dirname "$0")"
 nohup python3 server.py > server_output.log 2>&1 &
 SERVER_PID=$!
 
@@ -23,6 +24,6 @@ echo "服務器已在背景啟動 (PID: $SERVER_PID)"
 echo "訪問 http://localhost:8000 開始遊戲"
 echo ""
 echo "管理命令："
-echo "  查看狀態: ./status_server.sh"
-echo "  停止服務: ./stop_server.sh"
-echo "  查看日誌: tail -f server.log"
+echo "  查看狀態: ./server-utils/status_server.sh"
+echo "  停止服務: ./server-utils/stop_server.sh"
+echo "  查看日誌: tail -f server-utils/server.log"
