@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CyberCats 2087</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0a0a0a;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            touch-action: manipulation;
+        }
+        
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.3);
+        }
+        
+        #gameCanvas {
+            border: 2px solid #00ffff;
+            background: 
+                linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+                radial-gradient(circle at 20% 20%, rgba(0, 100, 200, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 200, 100, 0.1) 0%, transparent 50%),
+                #000;
+            background-size: 50px 50px, 50px 50px, 100% 100%, 100% 100%, 100% 100%;
+            position: relative;
+            display: block;
+            max-width: 100vw;
+            max-height: 100vh;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .ui-panel {
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            pointer-events: auto;
+            backdrop-filter: none;
+            box-shadow: none;
+        }
+        
+        .stats {
+            font-size: 14px;
+            line-height: 1.6;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+            font-weight: 500;
+        }
+        
+        .stats div {
+            margin-bottom: 4px;
+        }
+        
+        .stats div:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* 手機響應式設計 */
+        @media (max-width: 768px) {
+            body {
+                padding: 0;
+                margin: 0;
+                overflow: hidden;
+            }
+            
+            #gameContainer {
+                width: 100vw;
+                height: 100vh;
+                box-shadow: none;
+            }
+            
+            #gameCanvas {
+                width: 100vw !important;
+                height: 100vh !important;
+                border: none;
+                max-width: none;
+                max-height: none;
+                object-fit: cover;
+                object-position: center center;
+            }
+            
+            #ui {
+                top: 5px;
+                left: 5px;
+                right: 5px;
+                bottom: auto;
+                gap: 5px;
+            }
+            
+            .stats {
+                font-size: 14px;
+                font-weight: normal;
+                text-shadow: 1px 1px 3px rgba(0, 0, 0, 1);
+                background: transparent;
+                border-radius: 3px;
+                padding: 4px 8px;
+                border: none;
+                line-height: 1.1;
+                backdrop-filter: none;
+            }
+            
+            .ui-panel {
+                padding: 4px 8px;
+                background: transparent;
+                backdrop-filter: none;
+                border: none;
+                border-radius: 3px;
+                font-size: 14px;
+            }
+            
+            /* FPS 顯示優化 */
+            #fpsDisplay {
+                font-size: 12px;
+                background: rgba(0, 0, 0, 0.4);
+                padding: 3px 6px;
+                border-radius: 3px;
+                border: 1px solid rgba(0, 255, 136, 0.3);
+            }
+        }
+        
+        /* 豎屏手機特別優化 */
+        @media (max-width: 768px) and (orientation: portrait) {
+            #gameContainer {
+                /* 移除CSS縮放，改用程式控制 */
+                transform: none;
+            }
+            
+            #ui {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: flex-start;
+                gap: 2px;
+                /* 移除多餘的transform縮放 */
+            }
+            
+            .stats {
+                font-size: 12px;
+                width: auto;
+                flex: 1;
+                min-width: 120px;
+                max-width: 49%;
+                padding: 3px 6px;
+                line-height: 1.0;
+                background: transparent;
+                border: none;
+                backdrop-filter: none;
+            }
+            
+            .ui-panel:last-child {
+                flex: 1;
+                min-width: 120px;
+                max-width: 49%;
+                padding: 3px 6px;
+                background: transparent;
+                border: none;
+                backdrop-filter: none;
+            }
+            
+            .stats div {
+                margin-bottom: 2px;
+            }
+            
+            /* FPS 顯示調整 */
+            #fpsDisplay {
+                font-size: 11px;
+                padding: 2px 5px;
+            }
+        }
+        
+        /* 橫屏手機特別優化 */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .stats {
+                font-size: 10px;
+                padding: 3px 6px;
+                max-width: 180px;
+            }
+            
+            .ui-panel {
+                padding: 3px 6px;
+                max-width: 150px;
+            }
+        }
+        
+        /* 低高度螢幕優化 */
+        @media (max-height: 600px) {
+            #ui {
+                top: 2px;
+                gap: 2px;
+            }
+            
+            .stats {
+                font-size: 9px;
+                padding: 2px 5px;
+                line-height: 1.1;
+            }
+            
+            .ui-panel {
+                padding: 2px 5px;
+                font-size: 9px;
+            }
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border: 2px solid #ff0066;
+            border-radius: 15px;
+            box-shadow: 0 0 40px #ff0066;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+        
+        #gameOver h2 {
+            color: #ff0066;
+            font-size: 32px;
+            margin: 0 0 20px 0;
+            text-shadow: 0 0 25px #ff0066;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .restart-button {
+            padding: 15px 30px;
+            background: rgba(255, 0, 102, 0.2);
+            border: 2px solid #ff0066;
+            color: #ff0066;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            touch-action: manipulation;
+        }
+        
+        .restart-button:hover,
+        .restart-button:active {
+            background: rgba(255, 0, 102, 0.4);
+            box-shadow: 0 0 25px #ff0066;
+            transform: scale(1.05);
+        }
+        
+        /* FPS 和性能顯示 */
+        #fpsDisplay {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #00ff88;
+            font-size: 12px;
+            font-family: monospace;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        
+        /* 觸控提示 */
+        .touch-hint {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(0, 255, 255, 0.6);
+            font-size: 12px;
+            text-align: center;
+            pointer-events: none;
+            animation: fadeInOut 3s ease-in-out infinite;
+        }
+        
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+        
+        @media (max-width: 768px) {
+            .touch-hint {
+                bottom: 80px;
+                font-size: 14px;
+                background: rgba(0, 0, 0, 0.6);
+                padding: 8px 12px;
+                border-radius: 5px;
+                border: 1px solid rgba(0, 255, 255, 0.3);
+            }
+            
+            /* 遊戲結束畫面手機優化 */
+            #gameOver {
+                width: 90vw;
+                max-width: 400px;
+                padding: 25px 20px;
+                font-size: 14px;
+            }
+            
+            #gameOver h2 {
+                font-size: 24px;
+                margin-bottom: 15px;
+            }
+            
+            .restart-button {
+                padding: 15px 25px;
+                font-size: 16px;
+                font-weight: bold;
+                width: 80%;
+                margin-top: 15px;
+            }
+        }
+        
+        /* 移除未使用的技能UI樣式 */
+        /* 技能系統已整合到升級系統中 */
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="ui">
+            <div class="ui-panel">
+                <div class="stats">
+                    <div>基地血量: <span id="lives" style="color: #00ff00;">100</span></div>
+                    <div>金幣: <span id="gold" style="color: #ffff00;">300</span></div>
+                    <div>波數: <span id="wave" style="color: #00ffff;">1</span></div>
+                    <div>等級: <span id="level" style="color: #ff00ff;">1</span></div>
+                </div>
+            </div>
+            
+            <div class="ui-panel">
+                <div class="stats">
+                    <div>分數: <span id="score" style="color: #ff6600;">0</span></div>
+                    <div>擊殺: <span id="kills" style="color: #ff0066;">0</span></div>
+                    <div>連擊: <span id="streak" style="color: #ffff00;">0</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- FPS 顯示 -->
+        <div id="fpsDisplay">
+            FPS: <span id="fps">60</span>
+        </div>
+        
+        <!-- 移除未使用的技能UI -->
+        <!-- 技能系統已整合到升級系統中 -->
+        
+        <!-- 操作提示已移除 -->
+        <div class="touch-hint" id="experienceEnergyBars" style="display: none;">
+        </div>
+        
+        <!-- 遊戲結束畫面 -->
+        <div id="gameOver">
+            <h2>基地陷落</h2>
+            <p style="font-size: 18px; margin: 20px 0;">
+                賽博貓咪堅持了 <span id="finalWave" style="color: #00ffff; font-weight: bold;">0</span> 波攻擊
+            </p>
+            <p style="font-size: 14px; color: rgba(255, 255, 255, 0.8); margin-bottom: 30px;">
+                最終得分: <span id="finalScore" style="color: #ffff00;">0</span>
+            </p>
+            <button class="restart-button" id="restartButton">重新部署</button>
+        </div>
+    </div>
+    
+    <!-- 載入遊戲模組 -->
+    <!-- 模組系統和事件總線 -->
+    <script src="js/moduleLoader.js"></script>
+    <script src="js/eventBus.js"></script>
+    
+    <!-- 基礎設定和工具 -->
+    <script src="js/platformConfig.js"></script>
+    <script src="js/uiAdapter.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/constants.js"></script>
+    <script src="js/utils/utils.js"></script>
+    <script src="js/systems/timerManager.js"></script>
+    <script src="js/systems/objectPool.js"></script>
+    <script src="js/systems/spatialGrid.js"></script>
+    <script src="js/utils/performanceStats.js"></script>
+    
+    <!-- 核心管理器 -->
+    <script src="js/gameStateManager.js"></script>
+    <script src="js/systems/inputManager.js"></script>
+    <script src="js/managers/renderManager.js"></script>
+    
+    <!-- 輸入系統 -->
+    <script src="js/systems/mobileControls.js"></script>
+    <script src="js/mobile/touchEnhancer.js"></script>
+    
+    <!-- 渲染和視覺系統 -->
+    <script src="js/rendering/baseRenderer.js"></script>
+    <script src="js/utils/vectorIcons.js"></script>
+    
+    <!-- 遊戲物件 -->
+    <script src="js/entities/bulletSystem.js"></script>
+    <script src="js/entities/base.js"></script>
+    <script src="js/entities/enemy.js"></script>
+    <script src="js/entities/projectile.js"></script>
+    
+    <!-- 升級系統 -->
+    <script src="js/systems/experienceSystem.js"></script>
+    <script src="js/ui/upgradeDefinitions.js"></script>
+    <script src="js/ui/upgradeUI.js"></script>
+    <script src="js/systems/upgradeSystem.js"></script>
+    
+    <!-- 主遊戲 -->
+    <script src="js/game.js"></script>
+</body>
+</html>

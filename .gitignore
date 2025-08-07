@@ -92,6 +92,9 @@ build/
 out/
 .cache/
 
+# Webpack 臨時檔案
+temp/
+
 # 環境設定
 .env
 .env.local

@@ -1,7 +1,7 @@
 {
   "appId": "com.planbwork.cybercats",
   "appName": "CyberCats 2087",
-  "webDir": "mobile",
+  "webDir": "app",
   "includePlugins": [
     "@capacitor/splash-screen",
     "@capacitor/status-bar"
